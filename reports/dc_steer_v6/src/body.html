@@ -1,0 +1,641 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8">
+<title>dc_steer_v6 – Anwendungsreport</title>
+<link rel="stylesheet" href="style.css"></head>
+<body>
+
+<!-- ══════════════════════ INHALT ══════════════════════ -->
+<section class="cont">
+<h2>Inhalt</h2>
+<div class="toc">
+  <div class="e"><span class="n">1</span><span class="t">Management-Summary</span></div>
+  <div class="e"><span class="n">2</span><span class="t">Kontext: das Spielfeld</span><span class="d">TIG, die Challenge, und was tatsächlich gemessen wird</span></div>
+  <div class="e sub"><span class="n">2.1</span><span class="t">The Innovation Game in einem Absatz</span></div>
+  <div class="e sub"><span class="n">2.2</span><span class="t">Die Challenge <span class="mono">neuralnet_optimizer</span></span></div>
+  <div class="e sub"><span class="n">2.3</span><span class="t">Was der Code misst – und wo die Beschreibung abweicht</span></div>
+  <div class="e sub"><span class="n">2.4</span><span class="t">Der Gestaltungsraum des Innovators</span></div>
+  <div class="e"><span class="n">3</span><span class="t">Aufbau von dc_steer_v6</span></div>
+  <div class="e sub"><span class="n">3.1</span><span class="t">Verteilung nach Netztiefe</span></div>
+  <div class="e sub"><span class="n">3.2</span><span class="t">Der gemeinsame Kern</span></div>
+  <div class="e sub"><span class="n">3.3</span><span class="t">Umfang</span></div>
+  <div class="e sub"><span class="n">3.4</span><span class="t">Herkunft: was diese Einreichung beisteuert</span></div>
+  <div class="e"><span class="n">4</span><span class="t">Die fünf Tracks im Einzelnen</span></div>
+  <div class="e sub"><span class="n">4.1</span><span class="t">Familie A – Dual-Phase Consensus (T29, T30, T26)</span></div>
+  <div class="e sub"><span class="n">4.2</span><span class="t">Familie B – Prometheus (T27, T28)</span></div>
+  <div class="e sub"><span class="n">4.3</span><span class="t">Der Rechenkern: ein Start pro Schritt</span></div>
+  <div class="e"><span class="n">5</span><span class="t">DC-Steering – der eigentliche Beitrag</span></div>
+  <div class="e sub"><span class="n">5.1</span><span class="t">Ein Versatz, den der Gradient nicht sieht</span></div>
+  <div class="e sub"><span class="n">5.2</span><span class="t">Die Herleitung</span></div>
+  <div class="e sub"><span class="n">5.3</span><span class="t">Der Puls-Zyklus</span></div>
+  <div class="e sub"><span class="n">5.4</span><span class="t">Gain-Liniensuche und der Regressionskoeffizient</span></div>
+  <div class="e sub"><span class="n">5.5</span><span class="t">Einordnung: wie neu ist das?</span></div>
+  <div class="e"><span class="n">6</span><span class="t">Bewertung</span><span class="d">Stärken, Befunde, Zustand der Codebasis</span></div>
+  <div class="e sub"><span class="n">6.1</span><span class="t">Was überzeugt</span></div>
+  <div class="e sub"><span class="n">6.2</span><span class="t">Ein großer Teil der Maschinerie läuft nicht</span></div>
+  <div class="e sub"><span class="n">6.3</span><span class="t">Epochensignal, Schrittauflösung</span></div>
+  <div class="e sub"><span class="n">6.4</span><span class="t">Reproduzierbarkeit</span></div>
+  <div class="e sub"><span class="n">6.5</span><span class="t">Wie diese Befunde zu lesen sind</span></div>
+  <div class="e sub"><span class="n">6.6</span><span class="t">Befunde im Überblick</span></div>
+  <div class="e"><span class="n">7</span><span class="t">Wie man dc_steer_v6 weiterentwickeln könnte</span><span class="d">dreizehn Vorschläge in drei Horizonten</span></div>
+  <div class="e sub"><span class="n">7.1</span><span class="t">Schnell umsetzbar</span></div>
+  <div class="e sub"><span class="n">7.2</span><span class="t">Mittelfristig</span></div>
+  <div class="e sub"><span class="n">7.3</span><span class="t">Strategisch</span></div>
+  <div class="e sub"><span class="n">7.4</span><span class="t">Wege, die ich nicht gehen würde</span></div>
+  <div class="e sub"><span class="n">7.5</span><span class="t">Auf einen Blick</span></div>
+  <div class="e"><span class="n">8</span><span class="t">Übertragbarkeit über TIG hinaus</span></div>
+  <div class="e"><span class="n">A</span><span class="t">Anhang</span><span class="d">Dateien, Vorgabewerte, Lizenzen, Methodik</span></div>
+</div>
+</section>
+
+<!-- ══════════════════════ 1 SUMMARY ══════════════════════ -->
+<section>
+<h2><span class="num">1</span>Management-Summary</h2>
+
+<p class="lead"><span class="mono">dc_steer_v6</span> ist kein Optimierer, sondern fünf. Für jede der fünf Netztiefen, die die TIG-Challenge <span class="mono">neuralnet_optimizer</span> kennt, hält der Algorithmus eine eigene, getrennt abgestimmte Implementierung bereit. Zusammengehalten werden sie von einem gemeinsamen Kern und von einer Idee, die dem Algorithmus den Namen gibt: <strong>DC-Steering</strong>.</p>
+
+<h3><span class="num">1.1</span>Worum es geht</h3>
+<p>Die Challenge gibt eine Trainingsschleife vor und lässt genau eine Stellschraube offen: die Funktion, die aus Parametern und Gradienten die Parameteraktualisierung berechnet. Alles andere – Modell, Daten, Batchgröße, Abbruchkriterium – ist fixiert. Der Innovator konkurriert also nicht über Architektur oder Datenaufbereitung, sondern ausschließlich über die Qualität des Optimierungsverfahrens innerhalb eines festen Rechenbudgets.</p>
+
+<h3><span class="num">1.2</span>Was dc_steer_v6 tut</h3>
+<p>Die fünf Tracks zerfallen in zwei Familien. Die eine – <span class="mono">T29</span>, <span class="mono">T30</span>, <span class="mono">T26</span> – berechnet in jedem Schritt mehrere Aktualisierungsrichtungen nebeneinander (Adam, normalisierter Gradient, Vorzeichenschritt, ein Fisher-vorkonditionierter Schritt) und mischt sie abhängig davon, ob sie sich einig sind; wo sie sich im Vorzeichen widersprechen, übernimmt die robustere Schätzung. Die andere Familie – <span class="mono">T27</span>, <span class="mono">T28</span> – baut auf einem Adan/AdaBelief-Kern auf und schaltet je nach Track Muon-Orthogonalisierung, MARS-Varianzreduktion und eine Sophia-artige Krümmungsbegrenzung hinzu.</p>
+
+<p>Beide Familien werden über den Validierungsverlust gesteuert: Lernrate, Mischungsgewichte, Vertrauensgrenzen und Dämpfung hängen davon ab, ob sich der Verlust gerade verbessert, stagniert oder verschlechtert, und wie nah er an einem laufend geschätzten Rauschboden liegt.</p>
+
+<h3><span class="num">1.3</span>Der Kernbeitrag</h3>
+<div class="box key"><div class="t">DC-Steering in einem Satz</div>
+<p>Der Algorithmus berechnet in geschlossener Form, um welchen konstanten Betrag der Netzausgang verschoben werden muss, damit er im Mittel auf die Trainingsziele trifft, spielt diese Verschiebung als kurzen Puls genau vor der Validierung ein – und nimmt sie im nächsten Schritt wieder zurück.</p></div>
+
+<p>Das ist bemerkenswert, weil es eine echte Lücke in der Aufgabenstellung ausnutzt, ohne die Regeln zu verletzen. Die beiden letzten Schichten des Netzes sind eingefroren; ein systematischer Versatz am Ausgang lässt sich über den Gradienten nur mühsam ausgleichen. Der Betrag dieses Versatzes ist aber aus den Trainingszielen trivial berechenbar, und der Weg dorthin führt durch bekannte, eingefrorene Gewichte. Der Algorithmus löst also ein kleines lineares System statt zu warten, bis der Gradientenabstieg dasselbe auf Umwegen erledigt. Bewertet wird nicht das Endmodell, sondern das beste zwischengespeicherte – und genau dieser Prüfpunkt sieht die Korrektur.</p>
+
+<h3><span class="num">1.4</span>Befund</h3>
+<p>Handwerklich ist der Code deutlich über dem, was man in einem Benchmark-Beitrag erwartet: ein Kernelstart pro Schritt statt eines pro Tensor, deterministische Festkomma-Reihenfolgen in den kritischen Rechnungen, und eine Arbeitsweise, die auf byte-genaue Vergleichbarkeit zwischen Varianten ausgelegt ist. Die Kommentare dokumentieren gepaarte Messungen mit t-Werten – das ist eine Sorgfalt, die man selten sieht.</p>
+
+<p>Dem stehen drei Dinge gegenüber. Erstens ist der Umfang hoch: 7.194 Zeilen für eine Aufgabe, deren Referenzlösung mit rund neunzig auskommt, bei erheblicher Dopplung zwischen den Tracks. Zweitens sind die Zahlenwerte, die den Vorsprung ausmachen, nahezu vollständig eingebacken und nicht aus dem Lauf abgeleitet – verschiebt die Challenge ihr Gitter, muss neu abgestimmt werden. Drittens fehlt die Datei, auf die sich der Code für seine Messergebnisse beruft.</p>
+
+<h3><span class="num">1.5</span>Die drei wichtigsten Weiterentwicklungen</h3>
+<dl>
+<dt>1 &ensp;Den Rauschboden schätzen statt raten</dt>
+<dd>Der Algorithmus steuert an einer Größe namens <span class="mono">noise_variance</span> entlang, die er heuristisch aus dem Validierungsverlauf ableitet. Die Aufgabe erlaubt es, denselben Wert sauber zu schätzen. Das macht aus einer abgestimmten Konstante eine gemessene Größe – und nimmt der Abstimmung ihre Zerbrechlichkeit.</dd>
+<dt>2 &ensp;DC-Steering zu Ende denken</dt>
+<dd>Die Korrektur behandelt bislang nur den konstanten Anteil und nur über eine Schicht. Der gleiche Weg trägt auch eine Maßstabskorrektur – und die ist bei quadratischem Fehler genauso direkt wirksam wie der Versatz.</dd>
+<dt>3 &ensp;Fünf Tracks auf einen bringen</dt>
+<dd>Die beiden Familien lassen sich als eine parametrierte Implementierung schreiben. Das halbiert die Codebasis, macht jede künftige Verbesserung fünffach wirksam und beseitigt die Gefahr, dass eine Korrektur nur in vier von fünf Kopien ankommt.</dd>
+</dl>
+</section>
+
+<!-- ══════════════════════ 2 KONTEXT ══════════════════════ -->
+<section>
+<h2><span class="num">2</span>Kontext: das Spielfeld</h2>
+
+<h3><span class="num">2.1</span>The Innovation Game in einem Absatz</h3>
+<p>TIG dreht Proof-of-Work um. Statt Rechenleistung an einer künstlichen Hashaufgabe zu verbrennen, richtet das Protokoll sie auf acht echte Rechenprobleme – Erfüllbarkeit, Tourenplanung, Rucksackproblem, Vektorsuche, Hypergraphpartitionierung, Jobshop-Planung, Energiearbitrage und eben die Optimierung neuronaler Netze. Zwei Rollen greifen ineinander: <em>Innovatoren</em> reichen Algorithmen ein, <em>Benchmarker</em> lassen sie laufen und liefern Lösungsbeweise. Weil Benchmarker ein wirtschaftliches Interesse daran haben, den jeweils effizientesten Algorithmus zu wählen, entsteht aus ihrer Auswahl ein schwer manipulierbares Signal darüber, welcher Beitrag der beste ist – und daran hängt die Belohnung. Der Fachbegriff im Protokoll dafür ist <em>Optimisable Proof of Work</em>.</p>
+
+<p>Für den Innovator heißt das: Der Gegner ist nicht die Aufgabe, sondern das Feld. Es reicht nicht, die Schwelle zu reißen; man muss sie deutlicher reißen als alle anderen, und zwar innerhalb eines Rechenbudgets, das das Protokoll <em>Fuel</em> nennt. Bemerkenswert daran: Es gibt <strong>keine Zeitschranke</strong> – weder in der Ausführungsumgebung noch im Protokoll findet sich ein Zeitlimit. Gezählt werden Operationen. Auf der CPU geschieht das über eine instrumentierte Übersetzung, die einen Zähler <span class="mono">__fuel_remaining</span> herunterzählt; auf der GPU wird das Budget vor dem Start direkt in den PTX-Text eingesetzt und mit dem Faktor 20 skaliert, um es grob mit CPU-Kosten vergleichbar zu machen. Wer sein Budget überschreitet, liefert keine Lösung.</p>
+
+<p>Wie ein Algorithmus konkret verdient, steht in <span class="mono">tig-protocol</span> und ist aufschlussreich für die Bauweise. Jeder Benchmarker hat eine Obergrenze dafür, wie viele seiner Arbeitspakete je Block zählen – und diese Grenze wird von seiner <em>schwächsten</em> Challenge bestimmt. Das erzwingt Breite über alle acht Probleme. Innerhalb einer Challenge werden die Pakete je Track nach absteigender Quality sortiert und in zufälliger Reihenfolge abgearbeitet, bis die Obergrenze erschöpft oder das Track-Kontingent voll ist. Wer knapp hinter dem Feld liegt, qualifiziert sich nicht – nicht, weil er die Schwelle verfehlt hätte, sondern weil andere besser waren.</p>
+
+<div class="box"><div class="t">Warum das die Bauweise erklärt</div>
+<p>Vieles, was an <span class="mono">dc_steer_v6</span> zunächst übertrieben wirkt – fünf getrennte Implementierungen, eingebackene Zahlenwerte bis zur dritten Nachkommastelle, ein Kernelstart statt zwölf –, ist die direkte Folge dieser Anreizlage. In einem Wettbewerb, der relative Vorsprünge belohnt und Rechenzeit bestraft, ist Spezialisierung keine Nachlässigkeit, sondern die rationale Antwort.</p></div>
+
+<h3><span class="num">2.2</span>Die Challenge <span class="mono">neuralnet_optimizer</span></h3>
+<p>Die Aufgabe trainiert ein mehrschichtiges Perzeptron mit Batch-Normalisierung auf einem synthetischen Regressionsproblem. Die Zielfunktion wird aus 128 zufälligen Fourier-Merkmalen erzeugt – eine Summe von Kosinustermen mit zufälligen Frequenzen und Phasen – und anschließend mit gaußschem Rauschen der Standardabweichung <span class="mono">σ = 0,2</span> überlagert. Aus 1.450 erzeugten Punkten gehen 1.000 ins Training, 200 in die Validierung, 250 in den Test.</p>
+
+<table>
+<tr><th>Größe</th><th>Wert</th><th>Fundstelle</th></tr>
+<tr><td>Eingangsdimension</td><td class="mono">1</td><td class="ref">mod.rs:136</td></tr>
+<tr><td>Ausgangsdimension</td><td class="mono">2</td><td class="ref">mod.rs:137</td></tr>
+<tr><td>Breite der verborgenen Schichten</td><td class="mono">256</td><td class="ref">mod.rs:214</td></tr>
+<tr><td>Zahl der verborgenen Schichten</td><td class="mono">4, 7, 10, 14, 18</td><td class="ref">Track { n_hidden }</td></tr>
+<tr><td>Eingefrorene Schichten</td><td class="mono">2</td><td class="ref">mod.rs:219</td></tr>
+<tr><td>Batchgröße</td><td class="mono">128</td><td class="ref">mod.rs:215</td></tr>
+<tr><td>Epochen, höchstens</td><td class="mono">1000</td><td class="ref">mod.rs:216</td></tr>
+<tr><td>Geduld beim Abbruch</td><td class="mono">50</td><td class="ref">mod.rs:217</td></tr>
+<tr><td>Fourier-Merkmale K</td><td class="mono">128</td><td class="ref">mod.rs:132</td></tr>
+<tr><td>Längenmaß der Kernfunktion</td><td class="mono">0,3</td><td class="ref">mod.rs:134</td></tr>
+<tr><td>Rauschstärke σ</td><td class="mono">0,2</td><td class="ref">mod.rs:135</td></tr>
+</table>
+<div class="tcap"><b>Tabelle 1</b> — Die festen Größen der Challenge. Fundstellen in <span class="mono">tig-challenges/src/neuralnet_optimizer/mod.rs</span>.</div>
+
+<p>Zwei dieser Zeilen verdienen besondere Aufmerksamkeit. <strong>Die Schwierigkeit ist kein Zahlenpaar mehr, sondern eine Auswahl.</strong> Eine Aufgabeninstanz wird über <span class="mono">Track&nbsp;{ n_hidden }</span> beschrieben – nichts weiter. Ein Feld <span class="mono">difficulty</span> existiert im Datenmodell überhaupt nicht mehr; <span class="mono">BenchmarkSettings</span> führt eine <span class="mono">track_id</span>. Die ältere Maschinerie für zweidimensionale Schwierigkeitsgitter liegt zwar noch in <span class="mono">tig-utils/src/frontiers.rs</span>, wird aber von keiner Struktur des aktuellen Modells mehr benutzt.</p>
+
+<p>Es gibt also nicht ein Gitter aus Tiefe und Genauigkeitsanforderung, sondern <strong>fünf diskrete Aufgaben</strong>. Dass <span class="mono">dc_steer_v6</span> genau fünf Implementierungen hat, ist deshalb keine Übertreibung, sondern eine vollständige Fallunterscheidung – und der übliche Vorwurf, ein Beitrag sei „auf das Schwierigkeitsgitter überangepasst“, greift hier ins Leere: Ein Gitter gibt es nicht.</p>
+
+<p><strong>Und zwei Schichten sind eingefroren.</strong> <span class="mono">num_frozen_layers = 2</span> bedeutet, dass die letzten beiden linearen Schichten – darunter die Ausgabeschicht – ihre zufälligen Anfangswerte behalten. Das Netz muss also durch eine feste, zufällige Projektion hindurch lernen. Genau diese Einschränkung ist die Angriffsfläche, die DC-Steering nutzt (Abschnitt&nbsp;5).</p>
+
+<h3><span class="num">2.3</span>Was der Code misst – und wo die Beschreibung abweicht</h3>
+<p>Bewertet wird das beste während des Laufs gesicherte Modell auf dem Testteil. Die Kennzahl heißt <em>Quality</em> und ist eine Festkommazahl mit sechs Nachkommastellen:</p>
+
+<pre><span class="c">// tig-challenges/src/neuralnet_optimizer/mod.rs:274-280</span>
+<span class="k">let</span> epsilon_star_squared =
+    (4.0 / <span class="k">self</span>.dataset.test_size <span class="k">as</span> f32) * sum_sq_diff_true_vs_noisy;
+<span class="k">let</span> quality = (epsilon_star_squared <span class="k">as</span> f64 - avg_model_loss_on_test <span class="k">as</span> f64)
+    / epsilon_star_squared <span class="k">as</span> f64;
+<span class="k">let</span> quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION <span class="k">as</span> f64;</pre>
+
+<p>Quality misst also den <em>relativen Abstand unterhalb der Schwelle</em>, in Millionsteln. Wer die Schwelle genau trifft, bekommt null; wer sie um zehn Prozent unterbietet, bekommt 100.000. Das ist kein Bestanden-oder-nicht, sondern eine stetige Skala – und erklärt, warum die Kommentare im Algorithmus um Verbesserungen von wenigen tausend Zähleinheiten ringen.</p>
+
+<p>Rechnet man die Größen aus, ergibt sich ein aufschlussreiches Bild. Der Modellfehler wird als Mittel über alle 500 Ausgabeelemente des Testteils gebildet, die Schwelle dagegen mit dem Faktor <span class="mono">4/N</span> über eine Summe, die beide Ausgabedimensionen enthält – also über dieselben 500 Werte, aber geteilt durch 250. Effektiv liegt die Schwelle damit bei <span class="mono">ε*² ≈ 8σ² = 0,32</span>, während selbst ein perfektes Modell den Rauschboden <span class="mono">σ² = 0,04</span> nicht unterbieten kann. Die Annahmegrenze liegt also um den Faktor acht <em>über</em> dem Rauschboden – sie ist weit, nicht knapp.</p>
+
+<div class="box key"><div class="t">Die erreichbare Höchstpunktzahl ist eine exakte Zahl</div>
+<p>Träfe ein Modell die rauschfreie Zielfunktion exakt, wäre sein Testfehler <span class="mono">L = S/500</span> mit <span class="mono">S = Σ(y − f)²</span>, und die Schwelle wäre <span class="mono">ε*² = S/62,5</span>. Das Rauschen kürzt sich heraus:</p>
+<p style="text-align:center;margin:.35em 0"><span class="mono">Q<sub>max</sub> = (1 − 62,5/500) · 10⁶ = 875.000</span></p>
+<p>Unabhängig davon, wie das Rauschen in einer konkreten Instanz ausfällt. Jede erreichte Quality lässt sich damit unmittelbar als Anteil am Erreichbaren lesen.</p></div>
+
+<figure>
+<!--FIG:fig_quality-->
+<figcaption><b>Abbildung 1</b> — Test-Fehler und Quality sind dieselbe Größe in zwei Einheiten. Die Annahmegrenze ist weit; der Wettbewerb spielt sich im dunklen Teil der Skala ab, nahe am Rauschboden. Die Ableitung <span class="mono">dQ/dL</span> ist konstant: eine Verbesserung des Testfehlers um 0,001 ist gut 3.100 Quality-Punkte wert.</figcaption>
+</figure>
+
+<p>Damit lässt sich eine der Messangaben im Quelltext einordnen. Der Kommentar zu Track&nbsp;T26 nennt einen Median-Gewinn von <span class="mono">+4.501</span> Quality-Punkten für eine einzelne Änderung. Das entspricht einer Verbesserung des Testfehlers um rund <span class="mono">0,0014</span> – gemessen an einem Restabstand zum Rauschboden, der selbst nur wenige Hundertstel beträgt, ist das ein substanzieller Schritt.</p>
+
+<div class="box warn"><div class="t">Befund: Beschreibung und Code laufen auseinander</div>
+<p>Die README der Challenge beschreibt eine ältere Fassung der Aufgabe. Drei Abweichungen sind belegbar:</p>
+<ul class="tight">
+<li><strong>Dimensionen.</strong> Die README nennt acht Eingangs- und eine Ausgangsdimension; der Code arbeitet mit einer Eingangs- und zwei Ausgangsdimensionen.</li>
+<li><strong>Der zweite Schwierigkeitsparameter fehlt.</strong> Die README beschreibt <span class="mono">accuracy_factor</span> und <span class="mono">alpha = 4,0 − accuracy_factor/1000</span>. Im Code ist dieser Parameter <em>nirgends</em> zu finden; der Faktor 4,0 steht fest verdrahtet, und eine Aufgabeninstanz kennt nur <span class="mono">n_hidden</span>.</li>
+<li><strong>Das Längenmaß.</strong> Die README setzt <span class="mono">ω ~ N(0, l⁻²)</span>; der Kernel multipliziert eine standardnormalverteilte Zahl mit <span class="mono">1/l² = 11,11</span> statt mit <span class="mono">1/l = 3,33</span>. Das wirksame Längenmaß ist damit <span class="mono">0,09</span> statt 0,3 – die Zielfunktion schwingt deutlich schneller als dokumentiert.</li>
+</ul>
+<p>Wer sich beim Abstimmen auf die README verlässt, optimiert gegen eine Aufgabe, die es nicht mehr gibt.</p></div>
+
+<h3><span class="num">2.4</span>Der Gestaltungsraum des Innovators</h3>
+<p>Die Trainingsschleife liegt vollständig in der Challenge. Der Innovator füllt drei Funktionen aus: eine zum Anlegen des Optimiererzustands, eine optionale, die vor dem Vorwärtsdurchlauf Ersatzparameter vorschlagen darf, und die eigentliche Schrittfunktion, die aus Parametern und Gradienten die Aktualisierungen berechnet.</p>
+
+<figure>
+<!--FIG:fig_loop-->
+<figcaption><b>Abbildung 2</b> — Die feste Trainingsschleife und die beiden Stellen, an denen <span class="mono">dc_steer_v6</span> eingreift. Der mittlere Einstiegspunkt – der Lookahead-Kanal <span class="mono">optimizer_query_at_params</span> – wird von allen fünf Tracks ungenutzt gelassen; sie geben <span class="mono">None</span> zurück.</figcaption>
+</figure>
+
+<p>Zwei Eigenschaften dieser Schnittstelle prägen alles Weitere. Erstens bekommt die Schrittfunktion den <strong>Validierungsverlust</strong> übergeben – eine Rückmeldung über die Genera&shy;lisierung, die klassische Optimierer nicht haben. <span class="mono">dc_steer_v6</span> baut darauf seine gesamte Steuerung auf. Zweitens gilt: <strong>bewertet wird das beste gesicherte Modell, nicht das letzte.</strong> Die Trainingsbahn und der bewertete Punkt sind damit nicht dasselbe – und diese Lücke ist der Angelpunkt von DC-Steering.</p>
+</section>
+
+<!-- ══════════════════════ 3 AUFBAU ══════════════════════ -->
+<section>
+<h2><span class="num">3</span>Aufbau von dc_steer_v6</h2>
+
+<h3><span class="num">3.1</span>Verteilung nach Netztiefe</h3>
+<p>Die Einstiegsfunktion <span class="mono">solve_challenge</span> tut zwei Dinge: Sie schaltet das Ereignis-Tracking des CUDA-Streams ab, und sie verzweigt anhand von <span class="mono">challenge.num_hidden_layers</span> in eine von fünf getrennten Implementierungen. Dabei legt sie die für den jeweiligen Track abgestimmten Vorgabewerte auf – überschreibbar, aber vorbelegt.</p>
+
+<figure>
+<!--FIG:fig_dispatch-->
+<figcaption><b>Abbildung 3</b> — Die Fallunterscheidung in <span class="mono">mod.rs:63–112</span>. Die Track-Namen folgen der Entwicklungsgeschichte, nicht der Tiefe: <span class="mono">t26</span> bedient die Tiefe 10, <span class="mono">t29</span> die Tiefe 4.</figcaption>
+</figure>
+
+<p>Die vorbelegten Werte sind ungleich verteilt. Track&nbsp;T27 (Tiefe 14) bekommt vierzehn eingebackene Größen mit, darunter <span class="mono">ab_blend&nbsp;0,55</span>, <span class="mono">ema_decay&nbsp;0,9995</span> und <span class="mono">plateau_patience&nbsp;12</span>. Track&nbsp;T30 (Tiefe 7) bekommt eine einzige: <span class="mono">transition_sign&nbsp;0,13</span>. Das ist kein Versehen, sondern spiegelt, wie viel Abstimmungsarbeit in welchen Track geflossen ist.</p>
+
+<h3><span class="num">3.2</span>Der gemeinsame Kern</h3>
+<p>In <span class="mono">helpers.rs</span> liegt, was mehrere Tracks teilen: der Zustandstyp <span class="mono">OptimizerState</span> mit acht Puffern je Parametertensor, der Lernratenplan, die Regeln, nach denen aus dem Validierungsverlauf Mischungsgewichte und Dämpfungen entstehen – und seit dieser Fassung das verallgemeinerte DC-Modul.</p>
+
+<p>Bemerkenswert ist der Zustand selbst. Neben den üblichen ersten und zweiten Momenten führt der Optimierer je Tensor noch den vorigen Gradienten, die vorige Aktualisierung, eine langsame Aktualisierung für den Lookahead-Anteil, eine Fisher-Diagonale und einen Rückstandspuffer für die Vorzeichenquantisierung mit. Acht Puffer in Parametergröße sind, gemessen an Adams zweien, ein erheblicher Speicherpreis – der sich hier lohnt, weil das Netz mit 256 Neuronen Breite klein ist.</p>
+
+<h4>Steuerung über den Validierungsverlust</h4>
+<p>Der interessanteste Teil des gemeinsamen Kerns ist eine Größe namens <span class="mono">noise_variance</span>. Sie soll den Rauschboden der Aufgabe repräsentieren – jene Verlusthöhe, unterhalb derer kein Fortschritt mehr möglich ist. Der Algorithmus schätzt sie laufend aus dem Validierungsverlauf:</p>
+
+<pre><span class="c">// helpers.rs — Zielwert aus dem Verlauf, dann geglättet und gedeckelt</span>
+<span class="k">let</span> target_nv = (min_loss / 5.0).min(recent_avg / 8.0);
+s.noise_variance = 0.85 * s.noise_variance + 0.15 * target_nv;
+s.noise_variance = s.noise_variance.clamp(0.0, 0.05);</pre>
+
+<p>Die Divisoren 5 und 8 sind frei gewählt, die Obergrenze 0,05 liegt verdächtig nah an der echten Rauschvarianz 0,04. Diese Größe steuert anschließend nahezu alles: ob der Optimierer sich in der „Zone“ nahe dem Boden wähnt und die Lernrate um zwanzig Prozent zurücknimmt, ob er auf den robusten Pfad umschaltet, wie stark er bei Stagnation nachschiebt. <strong>Der Algorithmus hängt damit an einer Größe, die er schätzen könnte, aber heuristisch rät.</strong> Darauf kommt Abschnitt&nbsp;7 zurück.</p>
+
+<h3><span class="num">3.3</span>Umfang</h3>
+<figure>
+<!--FIG:fig_loc-->
+<figcaption><b>Abbildung 4</b> — Zeilenumfang je Track, getrennt nach Rust und CUDA. Zum Vergleich: die mitgelieferte Vorlage <span class="mono">template.rs</span> der Challenge kommt mit rund 90 Zeilen aus.</figcaption>
+</figure>
+
+<p>Der Unterschied zwischen T30 (1.782 Zeilen) und T28 (767 Zeilen) erklärt sich nicht durch die Aufgabe, sondern durch die Bauweise: <span class="mono">track_t30.rs</span> enthält in einem eigenen Modul eine <em>vollständige Kopie</em> der gemeinsamen Hilfsfunktionen, mit track-eigenen Abwandlungen. Dasselbe gilt in abgeschwächter Form für das DC-Modul, das in <span class="mono">track_t29.rs</span> als handgeschriebener Sonderfall und in <span class="mono">helpers.rs</span> noch einmal verallgemeinert vorliegt.</p>
+
+<div class="box warn"><div class="t">Befund: doppelte Wahrheit</div>
+<p>Die DC-Logik existiert zweimal – als handgeschriebene Fassung für Tiefe 4 in <span class="mono">track_t29.rs:162–381</span> und als verallgemeinertes Modul in <span class="mono">helpers.rs:366–861</span>, das die vier übrigen Tracks nutzen. Ein Unit-Test stellt sicher, dass die verallgemeinerte Indexrechnung die handgeschriebenen Konstanten reproduziert – aber nur die Indizes, nicht das Verhalten. Jede künftige Änderung am DC-Verfahren muss an beiden Stellen ankommen.</p></div>
+</section>
+
+<h3><span class="num">3.4</span>Herkunft: was diese Einreichung beisteuert</h3>
+<p>Die Challenge hat elf eingereichte Algorithmen, und sie erzählen eine erkennbare Geschichte. Am Anfang stehen einzelne Dateien von 170 bis 630 Zeilen – <span class="mono">nn_iza</span>, <span class="mono">adamlaterrt</span>, <span class="mono">prometheus_aidda</span>, <span class="mono">neural_alchemist</span>, <span class="mono">neural_advanced</span>. Ab <span class="mono">neural_advanced_v3</span> beginnt die Aufteilung nach Netztiefe, und der Umfang springt auf das Dreifache. Von da an wachsen die Beiträge in Stufen: <span class="mono">neural_extrem_v3</span>, <span class="mono">neural_extrem_v7</span> – und schließlich <span class="mono">dc_steer_v6</span>.</p>
+
+<p>Die Einreichenden wechseln dabei: <span class="mono">Rootz</span> baut die Advanced-Linie, <span class="mono">NVX</span> die Extrem-Linie, <span class="mono">ChervovNikita</span> reicht <span class="mono">dc_steer_v6</span> ein. Das ist bei TIG kein Bruch, sondern das vorgesehene Verhalten: Beiträge stehen unter offenen Lizenzen, damit andere darauf aufbauen. Der Dateivergleich zeigt die Verwandtschaft unmissverständlich – <span class="mono">dc_steer_v6</span> ist eine Fortschreibung von <span class="mono">neural_extrem_v7</span>, bis hin zu den Trackdateinamen und dem Text der Hilfeausgabe, die noch immer „Neural Extrem V7“ meldet.</p>
+
+<table>
+<tr><th>Datei</th><th class="num">v7</th><th class="num">dc_steer_v6</th><th class="num">geänderte Zeilen</th><th>Schwerpunkt der Änderung</th></tr>
+<tr><td class="mono">helpers.rs</td><td class="num">324</td><td class="num">861</td><td class="num">1.185</td><td>verallgemeinertes DC-Modul</td></tr>
+<tr><td class="mono">track_t29.rs</td><td class="num">387</td><td class="num">935</td><td class="num">630</td><td>DC von Hand + gebündelter Start</td></tr>
+<tr><td class="mono">track_t30.rs</td><td class="num">1.098</td><td class="num">1.288</td><td class="num">242</td><td>DC-Anbindung</td></tr>
+<tr><td class="mono">track_t26.rs</td><td class="num">406</td><td class="num">557</td><td class="num">237</td><td>DC-Anbindung, <span class="mono">init_scale</span></td></tr>
+<tr><td class="mono">track_t27.rs</td><td class="num">572</td><td class="num">630</td><td class="num">60</td><td>DC-Anbindung</td></tr>
+<tr><td class="mono">track_t28.rs</td><td class="num">329</td><td class="num">387</td><td class="num">60</td><td>DC-Anbindung</td></tr>
+<tr><td class="mono">mod.rs</td><td class="num">120</td><td class="num">138</td><td class="num">20</td><td>Vorgabewerte, <span class="mono">dc_gains</span></td></tr>
+</table>
+<div class="tcap"><b>Tabelle 2</b> — Vergleich mit dem Vorgänger. „Geänderte Zeilen“ zählt hinzugefügte und entfernte Zeilen zusammen.</div>
+
+<div class="box good"><div class="t">Der Beitrag ist scharf abgrenzbar</div>
+<p>Eine Suche nach <span class="mono">dc_axpy</span>, <span class="mono">dc_compute_delta</span>, <span class="mono">DcState</span> und <span class="mono">dc_gains</span> über <span class="mono">neural_extrem_v7</span> liefert <strong>keinen einzigen Treffer</strong>; dasselbe gilt für den gebündelten Mehrtensor-Start. Beides ist neu in dieser Einreichung. Der Consensus-Kern, die Steuerung über den Validierungsverlust und die Aufteilung nach Tiefe sind dagegen übernommen. <em>DC-Steering ist also nicht ein Detail dieses Beitrags – es ist der Beitrag.</em></p></div>
+
+
+<!-- ══════════════════════ 4 TRACKS ══════════════════════ -->
+<section>
+<h2><span class="num">4</span>Die fünf Tracks im Einzelnen</h2>
+
+<p class="lead">Die fünf Implementierungen sind nicht fünf Varianten desselben Verfahrens, sondern zwei verschiedene Verfahren in fünf Abstimmungen. Was sie eint, ist die Steuerung über den Validierungsverlust und die Art, wie sie auf die GPU gebracht werden.</p>
+
+<h3><span class="num">4.1</span>Familie A – Dual-Phase Consensus</h3>
+<p>Tracks <span class="mono">T29</span> (Tiefe 4), <span class="mono">T30</span> (Tiefe 7) und <span class="mono">T26</span> (Tiefe 10). Der Grundgedanke: Statt sich auf eine Aktualisierungsregel festzulegen, berechnet der Kernel drei Kandidaten nebeneinander und mischt sie.</p>
+
+<pre><span class="c">// kernels_t29.cu:179-184 — drei Richtungen aus denselben Momenten</span>
+<span class="k">const float</span> adam_u = -lr * (m_hat * inv_denom);          <span class="c">// Adam</span>
+<span class="k">const float</span> norm_u = -lr * (g_pred * inv_denom);         <span class="c">// normalisierter Gradient</span>
+<span class="k">const float</span> sign_u = -lr * copysignf(1.0f, m_hat);       <span class="c">// Vorzeichenschritt (Lion)</span>
+<span class="k">const float</span> base_u = blend_adam*adam_u + blend_norm*norm_u + blend_sign*sign_u;</pre>
+
+<p>Daneben läuft ein zweiter, robusterer Schätzer: eine über die Zeit geglättete Fisher-Diagonale, gespeist mit an ±6 Standardabweichungen beschnittenen Gradienten, gemischt mit dem reinen Vorzeichenschritt. Die Pointe ist, was danach passiert:</p>
+
+<pre><span class="c">// kernels_t29.cu:199-203 — der Konsens</span>
+<span class="k">const float</span> agree = (base_u * robust_u >= 0.0f) ? 1.0f : 0.0f;
+<span class="k">const float</span> vol   = fminf(sqrtf(fmaxf(v_hat, 0.0f)) * 0.5f, 1.0f);
+<span class="k">float</span> mix = (1.0f - agree) * (0.25f + 0.25f*vol) + 0.20f*blend_sign;
+<span class="k">float</span> u = (1.0f - mix) * base_u + mix * robust_u;</pre>
+
+<p><strong>Solange beide Schätzer im Vorzeichen übereinstimmen, bleibt es bei der aggressiven Mischung. Widersprechen sie sich, wandert bis zur Hälfte des Schritts zum robusten Schätzer</strong> – und zwar umso mehr, je unruhiger das lokale zweite Moment ist. Das ist eine elegante Formulierung des Grundproblems verrauschter Gradienten: Uneinigkeit zwischen einem momentumbasierten und einem krümmungsbasierten Schätzer ist ein gutes Signal dafür, dass man dem Gradienten gerade nicht trauen sollte.</p>
+
+<p>Danach folgen drei Korrekturen: eine Barzilai-Borwein-artige Skalierung anhand der vorigen Schrittweite, ein <em>Vertrauensgatter</em>, das die Schrittlänge in ein Band um den normalisierten Gradientenschritt zwingt (verwandt mit LARS), und ein Lookahead im Aktualisierungsraum – eine langsame geglättete Aktualisierung, die dem schnellen Schritt beigemischt wird. Der Gewichtsabfall wird entkoppelt angewandt, wie bei AdamW.</p>
+
+<h4>Was die Tracks dieser Familie unterscheidet</h4>
+<p>Bei <span class="mono">T30</span> hängen die Mischungsgewichte an einer Fallunterscheidung über den Trend des Validierungsverlusts: verbessert er sich deutlich, dominiert Adam; stagniert er, verschiebt sich Gewicht zum normalisierten Gradienten; verschlechtert er sich, greift ein Parameter namens <span class="mono">transition_sign</span> ein, der im Wesentlichen bestimmt, wie viel Vorzeichenschritt in der Übergangsphase beigemischt wird. Genau dieser Wert ist der einzige, den <span class="mono">mod.rs</span> für diesen Track vorbelegt – mit 0,13 statt der internen 0,15.</p>
+
+<p><span class="mono">T26</span> ergänzt eine Besonderheit beim Start: Im ersten Schritt addiert der Optimierer <span class="mono">(init_scale − 1)·W₀</span> auf die Aktualisierung der verborgenen Gewichte – eine nachträgliche Skalierung der Anfangswerte, hier auf den Faktor 3 gesetzt. Da die Initialisierung fest vorgegeben ist, ist das der einzige Weg, sie zu beeinflussen: über die erste Parameteraktualisierung.</p>
+
+<div class="box"><div class="t">Das Schrittbudget als Abbruchmechanismus</div>
+<p>Der Lernratenplan läuft nicht in Epochen, sondern in Schritten, und endet hart bei <span class="mono">total_steps</span>. Bei <span class="mono">T30</span> sind das 1.100 Schritte – bei acht Mini-Batches je Epoche also rund 137 Epochen. Danach ist der Kosinusfaktor exakt null und die Lernrate damit ebenfalls. Die Validierung verbessert sich nicht mehr, und die Geduld des Harness von 50 Epochen beendet den Lauf bei etwa Epoche 188 – knapp ein Fünftel der erlaubten tausend.</p>
+<p><span class="mono">total_steps</span> ist damit weniger ein Lernratenparameter als ein <strong>Ausstiegskriterium</strong>: Der Algorithmus entscheidet selbst, wann er aufhört, und spart das übrige Rechenbudget. In einem Wettbewerb, der Fuel zählt, ist das ein eigenständiger Hebel.</p></div>
+
+<h3><span class="num">4.2</span>Familie B – Prometheus</h3>
+<p>Tracks <span class="mono">T27</span> (Tiefe 14) und <span class="mono">T28</span> (Tiefe 18). Der Zustandstyp heißt hier <span class="mono">PrometheusState</span> und verrät die Herkunft: Diese Linie stammt erkennbar aus dem Schwesteralgorithmus <span class="mono">prometheus_aidda</span>. Der Kern ist eine Adan/AdaBelief-Mischung in einem einzigen Kernel:</p>
+
+<pre><span class="c">// kernels_t27.cu — der Kern, leicht gekürzt</span>
+<span class="k">float</span> m_new = 0.98f*m + 0.02f*g;                 <span class="c">// erstes Moment</span>
+<span class="k">float</span> v_new = 0.92f*v + 0.08f*g_diff;            <span class="c">// Gradientendifferenz (Adan)</span>
+<span class="k">float</span> g_adan = g + 0.92f*g_diff;
+n_tgt = ab_blend*g_adan*g_adan + (1-ab_blend)*(g-m_new)*(g-m_new);  <span class="c">// AdaBelief-Anteil</span>
+<span class="k">float</span> adan_dir = (m_qh + 0.92f*v_new) / (sqrtf(n_new) + eps);
+<span class="k">float</span> wd_gate = (adan_dir*theta >= 0.0f) ? 1.0f : 0.0f;   <span class="c">// Zerfall nur „nach innen"</span>
+<span class="k">float</span> keep = (dir*g > 0.0f) ? 1.0f : 0.25f;               <span class="c">// Vorzeichenkonsens</span>
+<span class="k">float</span> d_adan = -lr * keep * dir;</pre>
+
+<p>Zwei Details sind hier interessant. Das <span class="mono">wd_gate</span> lässt den Gewichtsabfall nur wirken, wenn er in dieselbe Richtung zeigt wie der Schritt – der Parameter wird also nie gegen die Optimierungsrichtung zur Null gezogen. Und <span class="mono">keep</span> ist wieder ein Konsensgedanke, diesmal in der einfachsten denkbaren Form: Zeigt die berechnete Richtung gegen den rohen Gradienten, wird der Schritt auf ein Viertel gestutzt.</p>
+
+<p>Darüber liegen bei <span class="mono">T27</span> drei zuschaltbare Ebenen, alle über Vorgabewerte gesteuert: <strong>MARS</strong> als vorgeschalteter Kernel, der eine varianzreduzierte Gradientenschätzung bildet; <strong>Muon</strong>, das über eine Newton-Schulz-Iteration die 256×256-Gewichtsmatrizen orthogonalisiert; und eine <strong>Sophia</strong>-artige Variante, die den Wurzelnenner durch eine lineare, beschnittene Form ersetzt. <span class="mono">T28</span> ist dieselbe Architektur ohne diese Ebenen – schlanker, und mit 767 Zeilen der kompakteste Track.</p>
+
+<div class="box key"><div class="t">Die Arbeitsweise hinter den Schaltern</div>
+<p>Jede dieser Ebenen hat einen Vorgabewert, der sie exakt neutralisiert: <span class="mono">mars_gamma = 0</span> überspringt den MARS-Kernel vollständig, <span class="mono">ab_blend = 1,0</span> nimmt den AdaBelief-Anteil heraus, <span class="mono">sophia_rho = 0</span> stellt den Wurzelpfad wieder her. Die Kommentare sprechen von „byte-exakter Parität" und nennen Prüfwerte. Das ist keine Kosmetik, sondern eine Messmethodik: Man kann jede Erweiterung einzeln zuschalten und weiß sicher, dass der Rest des Programms bitgleich geblieben ist. Wer je versucht hat, den Effekt einer Optimiererkomponente von Gleitkommadrift zu trennen, weiß, wie viel das wert ist.</p></div>
+
+<h3><span class="num">4.3</span>Der Rechenkern: ein Start pro Schritt</h3>
+<p>Die naive Umsetzung startet je Parametertensor einen Kernel – bei Tiefe 7 also 24 Starts je Mini-Batch, mal acht Batches, mal rund 140 Epochen. <span class="mono">dc_steer_v6</span> fasst das zusammen, nach dem Muster von NVIDIAs <span class="mono">multi_tensor_apply</span>: Ein einziger Kernel bearbeitet alle Tensoren, jeder Block findet per Binärsuche über eine Präfixsummentabelle heraus, für welchen Tensor er zuständig ist.</p>
+
+<p>Die Sorgfalt dabei ist bemerkenswert. Die eigentliche Rechnung liegt in <span class="mono">__device__ __forceinline__</span>-Funktionen, die sowohl vom alten Einzelkernel als auch vom gebündelten aufgerufen werden – <em>derselbe Text</em>, damit der schnelle Pfad nicht vom Referenzpfad abdriften kann. Der Kommentar dazu ist unmissverständlich: „DO NOT EDIT WITHOUT RE-RUNNING THE GATE."</p>
+
+<p>Hinzu kommen kleinere Eingriffe, im Code als <span class="mono">P2</span> bis <span class="mono">P6</span> nummeriert: Statische Teile der Sprungtabelle werden einmalig hochgeladen statt je Schritt; die zurückgegebene Aktualisierungsliste wird auf die Länge gekürzt, die der Harness tatsächlich ausliest; und das Ereignis-Tracking der CUDA-Puffer wird abgeschaltet, weil es in einem Einstrom-Programm nur Kosten verursacht.</p>
+
+<div class="box good"><div class="t">Nachgeprüft: die <span class="mono">unsafe</span>-Begründung trägt</div>
+<p>Das Abschalten des Ereignis-Trackings in <span class="mono">mod.rs:57</span> ist der einzige <span class="mono">unsafe</span>-Block des Algorithmus. Seine Begründung stützt sich darauf, dass das Programm nur einen einzigen CUDA-Stream benutzt. Eine Suche über <span class="mono">tig-runtime</span>, <span class="mono">tig-binary</span> und <span class="mono">tig-challenges</span> findet genau einen Stream-Bezug – <span class="mono">ctx.fuel_check_stream()</span> in <span class="mono">tig-runtime/src/main.rs:210</span> – und keinen einzigen Aufruf von <span class="mono">new_stream()</span>. Die Voraussetzung hält also; die Sicherheitsargumentation ist unter dieser Bedingung stichhaltig.</p></div>
+</section>
+
+<!-- ══════════════════════ 5 DC ══════════════════════ -->
+<section>
+<h2><span class="num">5</span>DC-Steering – der eigentliche Beitrag</h2>
+
+<p class="lead">Alles Bisherige ist gute Handwerkskunst: bekannte Bausteine, sorgfältig kombiniert und abgestimmt. Der Namensgeber des Algorithmus ist etwas anderes – eine Beobachtung über die Aufgabe selbst, die sich in eine geschlossene Formel übersetzen lässt.</p>
+
+<h3><span class="num">5.1</span>Ein Versatz, den der Gradient nicht sieht</h3>
+<p>„DC" ist hier im nachrichtentechnischen Sinn gemeint: der Gleichanteil, der konstante Sockel eines Signals. Die Trainingsziele haben einen solchen Sockel – ihr Mittelwert ist nicht null. Ein Modell, dessen Ausgang im Mittel daneben liegt, zahlt diesen Versatz im quadratischen Fehler doppelt: Der mittlere quadratische Fehler zerfällt in einen Verzerrungs- und einen Varianzanteil, und ein konstanter Versatz geht als Quadrat direkt in den ersten ein.</p>
+
+<p>Normalerweise erledigt der Gradientenabstieg das nebenbei – die Ausgabeschicht verschiebt ihren Bias, fertig. Hier nicht. <strong>Die letzten beiden linearen Schichten sind eingefroren</strong>; ihr Bias ist unerreichbar. Der Versatz muss durch eine feste, zufällige Projektion hindurch erzeugt werden, aus den Parametern davor. Das kann der Gradientenabstieg zwar, aber langsam und auf Umwegen – er sieht nur den lokalen Anstieg, nicht die algebraische Struktur des Problems.</p>
+
+<p>Der Algorithmus dagegen sieht sie. Der Zielmittelwert ist aus den Trainingsdaten, die der Optimierer ohnehin in der Hand hat, in einer Zeile berechenbar. Der Weg von der letzten trainierbaren BatchNorm-Verschiebung bis zum Netzausgang führt ausschließlich durch bekannte, eingefrorene Gewichte. Also lässt sich direkt ausrechnen, welche Verschiebung nötig ist.</p>
+
+<h3><span class="num">5.2</span>Die Herleitung</h3>
+<p>Sei <span class="mono">β</span> die Verschiebung der letzten trainierbaren BatchNorm-Schicht, <span class="mono">W₃</span> die darauffolgende eingefrorene lineare Schicht, <span class="mono">σ<sub>i</sub></span> die Normierungsgrößen der letzten BatchNorm und <span class="mono">W₄</span> die eingefrorene Ausgabeschicht. Eine kleine Änderung <span class="mono">dβ</span> wandert wie folgt zum Ausgang:</p>
+
+<div class="box key"><div class="t">Die Linearisierung</div>
+<p><span class="mono">du<sub>i</sub> = (W₃ dβ)<sub>i</sub></span>&ensp;→&ensp;<span class="mono">d E[relu(u<sub>i</sub>)] ≈ p<sub>i</sub> · du<sub>i</sub></span>&ensp;→&ensp;Division durch <span class="mono">σ<sub>i</sub></span>&ensp;→&ensp;Auslesen über <span class="mono">W₄</span></p>
+<p style="margin-top:.4em">Zusammengefasst ergibt das die Jacobi-Matrix <span class="mono">A[j,k] = Σ<sub>i</sub> W₄[j,i] · p / σ<sub>i</sub> · W₃[i,k]</span>, und gesucht ist <span class="mono">δ</span> mit <span class="mono">A δ = m</span>, wobei <span class="mono">m</span> der Mittelwert der Trainingsziele je Ausgabedimension ist.</p></div>
+
+<p>Da <span class="mono">A</span> nur zwei Zeilen hat – so viele wie Ausgabedimensionen – und 256 Spalten, ist das System massiv unterbestimmt. Der Code löst es in der Minimalnormlösung über das 2×2-Gram-System, mit einer Tichonow-Regularisierung von <span class="mono">10<sup>−6</sup>·spur</span>, und deckelt anschließend die Maximumsnorm von <span class="mono">δ</span> auf 2.</p>
+
+<p>Der eine nicht beobachtbare Term ist <span class="mono">p<sub>i</sub></span>, der Anteil der ReLU-Einheiten, die gerade aktiv sind. Über die Optimiererschnittstelle ist er nicht zugänglich, also wird er auf <span class="mono">½</span> gesetzt. Die Begründung im Quelltext ist sauber: Weil die Zeilen von <span class="mono">W₄</span> unabhängige Zufallsvektoren sind und die Zeilen von <span class="mono">W₃</span> untereinander kaum korrelieren, wirkt ein falsch angesetztes <span class="mono">p</span> fast genau wie ein <em>Skalar</em> – die Nebendiagonalen des Fehlerterms sind von der Größenordnung <span class="mono">1/√256</span>. Ein skalarer Fehler aber lässt sich durch einen einzigen Verstärkungsfaktor auffangen. Genau dafür gibt es die Gain-Liniensuche.</p>
+
+<h3><span class="num">5.3</span>Der Puls-Zyklus</h3>
+<p>Die Verschiebung wird nicht dauerhaft eingebaut, sondern als Puls eingespielt und wieder zurückgenommen.</p>
+
+<figure>
+<!--FIG:fig_dc-->
+<figcaption><b>Abbildung 5</b> — Ablauf über zwei Epochen. Die Kernstelle ist <span class="mono">helpers.rs:749–836</span>; die handgeschriebene Fassung für Tiefe 4 steht in <span class="mono">track_t29.rs:237–381</span>.</figcaption>
+</figure>
+
+<p>Zwei Entscheidungen in diesem Ablauf sind subtil und beide richtig.</p>
+
+<p><strong>Der Zeitpunkt.</strong> Der Puls wird im <em>letzten</em> Schritt einer Epoche eingespielt, unmittelbar bevor die Validierung läuft. Der Grund steht im Kommentar: So sieht die Validierung die Verschiebung „gegen eine noch vollständig veraltete Laufstatistik". Hätte die BatchNorm den Versatz bereits in ihre laufenden Mittelwerte aufgenommen, würde sie ihn im Auswertungsmodus wieder herausnormieren – der Puls verpuffte. Er wirkt nur, solange die Statistik ihn noch nicht kennt.</p>
+
+<p><strong>Die Rücknahme.</strong> Im ersten Schritt der Folgeepoche wird der Puls subtrahiert. Das Training läuft also auf der unveränderten Bahn weiter. Wirksam wird die Korrektur ausschließlich an dem Punkt, an dem der Harness bewertet und das beste Modell sichert. <strong>Der Algorithmus trennt damit die Trainingsbahn von dem Punkt, der bewertet wird</strong> – und nutzt dafür den einzigen Kanal, den die Schnittstelle bietet: die Parameteraktualisierung.</p>
+
+<h3><span class="num">5.4</span>Gain-Liniensuche und der Regressionskoeffizient</h3>
+<p>Wie stark der Puls ausfallen soll, wird gemessen statt geraten. In einer Probephase wechseln sich gepulste und ungepulste Epochen ab; bewertet wird die Differenz der Validierungsverluste. Weil die Epochen paarweise verglichen werden, fällt die Drift des laufenden Trainings aus der Differenz heraus – eine gepaarte Messung, wie man sie aus der Versuchsplanung kennt. Nach der Probephase setzt <span class="mono">argmin</span> den besten Faktor dauerhaft; <span class="mono">δ</span> wird alle acht Epochen neu berechnet.</p>
+
+<p>Für die meisten Tracks ist die Kandidatenliste inzwischen einelementig – die Messung ergab, dass eine fünfstufige Leiter denselben Median liefert wie der feste analytische Faktor 1,0, aber mehr Rechenzeit kostet. Eine Ausnahme ist Track&nbsp;T26, und die dortige Begründung ist der interessanteste Kommentar im ganzen Algorithmus:</p>
+
+<pre><span class="c">// mod.rs:86-92</span>
+<span class="c">// The DC pulse solve linearises the ReLU active fraction at p == 0.5 and assumes the</span>
+<span class="c">// pre-pulse eval DC is zero, so it undershoots. The least-squares optimal correction</span>
+<span class="c">// is the REGRESSION coefficient E[c]/E[t^2] = 1.214 (not 1/E[c] = 1.32 -- the pulse's</span>
+<span class="c">// own realisation is stochastic). Measured on this track at n=120 over 8 fresh</span>
+<span class="c">// bundles: +4,501 bundle-median (t = +2.20, 7/8 bundles positive) and 5.0 % FASTER.</span>
+<span class="c">// Confirmed dead on n_hidden=7 at the same power (+178, t = +0.14), hence per-track.</span></pre>
+
+<p>Der Gedanke dahinter: Die Herleitung unterschätzt systematisch, weil sie bei <span class="mono">p = ½</span> linearisiert und unterstellt, der Ausgang habe vor dem Puls keinen Versatz. Die naheliegende Korrektur wäre, durch den mittleren erreichten Anteil zu teilen – <span class="mono">1/E[c] = 1,32</span>. Das wäre richtig, wenn der Puls genau träfe. Er trifft aber nur im Mittel; seine tatsächliche Wirkung streut. Und wenn die erklärende Größe selbst verrauscht ist, ist der kleinste-Quadrate-optimale Faktor nicht der Kehrwert des Mittelwerts, sondern der <em>Regressionskoeffizient</em> <span class="mono">E[c]/E[t²]</span> – der wegen des Rauschanteils im Nenner kleiner ausfällt: 1,214 statt 1,32.</p>
+
+<div class="box good"><div class="t">Das ist statistisch richtig gedacht</div>
+<p>Der Unterschied zwischen <span class="mono">1/E[c]</span> und <span class="mono">E[c]/E[t²]</span> ist genau die klassische Abschwächung durch Fehler in der erklärenden Variablen. Wer den Kehrwert nimmt, überkorrigiert und zahlt den Fehler quadratisch. Der Kommentar dokumentiert zudem Stichprobenumfang, t-Wert, Streuung über acht unabhängige Bündel und den negativen Befund auf einem anderen Track. Das ist eine Sorgfalt, die man in Benchmark-Beiträgen selten findet – und der Grund, warum die Zahl track-spezifisch eingebacken und nicht global gesetzt wurde.</p></div>
+
+<h3><span class="num">5.5</span>Einordnung: wie neu ist das?</h3>
+<p>Jeder Baustein für sich ist bekannt. Ein Ausgabe-Bias an den Zielmittelwert anzupassen, ist Standard. Eine Verstärkung per Liniensuche zu bestimmen, ist Standard. Gepaarte Vergleiche sind Standard. Auch die Idee, an eingefrorenen Schichten vorbei analytisch zu rechnen, findet sich in der Literatur zu Random-Feature-Modellen.</p>
+
+<p>Neu ist die <em>Kombination im Kontext dieser Schnittstelle</em>. Der Algorithmus nutzt drei Eigenheiten der Aufgabe gleichzeitig aus: dass die letzten Schichten eingefroren und damit bekannt sind; dass BatchNorm im Auswertungsmodus eine veraltete Statistik verwendet und ein frischer Versatz deshalb durchschlägt; und dass der Harness nicht das Endmodell, sondern das beste Zwischenmodell bewertet. Keine dieser Eigenheiten ist ein Fehler der Challenge – zusammen ergeben sie aber eine Nische, die eine rein gradientenbasierte Methode nicht erreicht.</p>
+
+<p>Ehrlicherweise gehört dazu die Einschränkung: Das ist zu einem guten Teil <em>Aufgabenausnutzung</em>, nicht allgemeiner Optimiererfortschritt. Welcher Anteil sich übertragen lässt, behandelt Abschnitt&nbsp;8.</p>
+</section>
+
+<!-- ══════════════════════ 6 BEWERTUNG ══════════════════════ -->
+<section>
+<h2><span class="num">6</span>Bewertung</h2>
+
+<h3><span class="num">6.1</span>Was überzeugt</h3>
+<dl>
+<dt>Die Kernidee trägt</dt>
+<dd>DC-Steering ist eine echte Einsicht über die Aufgabe, sauber hergeleitet, korrekt umgesetzt und mit einer statistisch richtig gedachten Korrektur versehen. Das ist mehr als Parametersuche.</dd>
+<dt>Die Messmethodik ist vorbildlich</dt>
+<dd>Gepaarte Vergleiche, mehrere unabhängige Bündel, t-Werte, dokumentierte Negativbefunde, Vorgabewerte, die Erweiterungen byte-exakt neutralisieren. Wer so arbeitet, kann Effekte von Gleitkommadrift trennen – die meisten können das nicht.</dd>
+<dt>Der Rechenkern ist ernsthaft optimiert</dt>
+<dd>Ein Kernelstart je Schritt statt eines je Tensor, einmalig hochgeladene statische Tabellen, gekürzte Rückgabelisten, abgeschaltetes Ereignis-Tracking – und die eigentliche Rechnung liegt in gemeinsamen <span class="mono">__forceinline__</span>-Rümpfen, damit der schnelle Pfad nicht vom Referenzpfad abweichen kann.</dd>
+<dt>Die Determinismus-Disziplin an den richtigen Stellen</dt>
+<dd>Die DC-Rechnung läuft vollständig in <span class="mono">f64</span> in fester Reihenfolge, explizit als deterministisch dokumentiert. Für ein Protokoll, das Lösungen nachprüft, ist das genau die richtige Sorge.</dd>
+</dl>
+
+<h3><span class="num">6.2</span>Der wichtigste Befund: ein großer Teil der Maschinerie läuft nicht</h3>
+<p>Liest man den Code als Beschreibung dessen, was im Benchmark tatsächlich passiert, klafft eine Lücke. Eine ganze Reihe von Mechanismen ist in der ausgelieferten Konfiguration unerreichbar oder wirkungslos. Die folgenden Punkte habe ich einzeln am Quelltext nachgeprüft.</p>
+
+<h4>Von dreizehn CUDA-Kernels in T27 laufen zwei</h4>
+<p><span class="mono">kernels_t27.cu</span> definiert dreizehn Kernels. Vier werden nirgends geladen: die unfusionierte Altfassung <span class="mono">adabelief_update_kernel_t27</span>, die beiden Consensus-Kernels <span class="mono">sign_ef_consensus_kernel_14</span> und <span class="mono">dual_consensus_fisher_kernel_14</span> sowie <span class="mono">grokfast_ema_kernel</span>. Sechs weitere – die Newton-Schulz-Kette für Muon – werden nur geladen, wenn <span class="mono">muon_lr_scale > 0</span> gilt; der Vorgabewert ist 0, und <span class="mono">mod.rs</span> setzt ihn nicht. <span class="mono">mars_correction_kernel</span> läuft nur bei <span class="mono">mars_gamma > 0</span>; <span class="mono">mod.rs:108</span> backt ausdrücklich <span class="mono">0.0</span>. Auch <span class="mono">sophia_rho</span> steht auf 0.</p>
+
+<div class="box warn"><div class="t">Was das bedeutet</div>
+<p>Muon, MARS und Sophia – die drei Bausteine, die den Track am modernsten aussehen lassen – sind im ausgelieferten Zustand <strong>alle abgeschaltet</strong>. Ausgeführt werden <span class="mono">adabelief_fused_kernel_t27</span> und <span class="mono">dc_axpy_t27</span>. Die Bausteine sind über Hyperparameter erreichbar und insofern nicht wertlos; als Beschreibung dessen, was den Benchmarkvorsprung erzeugt, sind sie irreführend.</p></div>
+
+<h4>Die Dämpfung der Ausgabeschicht kann nicht wirken</h4>
+<p><span class="mono">output_layer_damping</span> taucht in allen Tracks auf, mit sorgfältig abgestimmten Werten zwischen 0,77 und 0,86. Die Bedingung in der Schrittfunktion von T29 lautet <span class="mono">i + 2 >= last</span> mit <span class="mono">last = gradients.len() = 26</span>, während die Schleife nur über <span class="mono">0..20</span> läuft – der Zweig ist unerreichbar. In der Initialisierung ist er erreichbar, trifft dort aber die Indizes 24 und 25, also die Laufstatistiken der letzten BatchNorm, die nie aktualisiert werden.</p>
+<p>Der tiefere Grund ist einfacher: <strong>Die Ausgabeschicht ist von der Challenge eingefroren.</strong> Sie bekommt überhaupt keine Aktualisierung. Eine Dämpfung ihrer Lernrate kann per Konstruktion nichts bewirken. Derselbe Befund gilt sinngemäß für T30, T26 und T27.</p>
+
+<h4>Der Gewichtsabfall in T26 ist keiner</h4>
+<p>Der schnelle Pfad von T26 rechnet:</p>
+<pre><span class="c">// kernels_t26.cu:228</span>
+<span class="k">const float</span> adam_update = -lr * (m_hat * inv_denom + weight_decay * g_pred);</pre>
+<p>Der Zerfallsterm multipliziert den <em>Gradienten</em>, nicht das Gewicht. Das ist weder klassischer L2-Zerfall noch der entkoppelte Zerfall von AdamW – es ist ein zusätzlicher kleiner SGD-Anteil, der nichts reguliert. Der robuste Pfad derselben Datei macht es zwei Zeilen weiter richtig (<span class="mono">adj_update -= wd_lr * w</span>), und T29 macht es durchgehend richtig (<span class="mono">final_u -= (lr * weight_decay) * params[idx]</span>). Innerhalb eines Tracks weichen die beiden Pfade also im Verhalten voneinander ab.</p>
+
+<h4>Eingebackene Werte ohne Abnehmer</h4>
+<p><span class="mono">mod.rs:90</span> setzt für T26 <span class="mono">init_scale = 3.0</span> – eine dreifache Skalierung der Anfangsgewichte, auf den ersten Blick ein kräftiger Eingriff. Die zugehörige Bedingung prüft <span class="mono">s.step_count == 0</span>, nachdem der Zähler bereits erhöht wurde. Der Kommentar im Code benennt das selbst: <span class="ref">track_t26.rs:370</span> „<em>this branch is structurally unreachable and the kernel is never launched … Kept verbatim for parity</em>“. Das ist also bekannt und bewusst stehen gelassen – der eingebackene Wert 3,0 suggeriert dennoch eine Wirkung, die es nicht gibt. Ähnlich liegt es bei fünf der vierzehn für T27 vorbelegten Größen, für die der Track keinen Leser hat.</p>
+
+<h3><span class="num">6.3</span>Ein systematischer Fehlgriff: Epochensignal, Schrittauflösung</h3>
+<p>Dieser Punkt betrifft alle fünf Tracks und ist der gewichtigste. Der Harness übergibt an <span class="mono">optimizer_step</span> nicht den aktuellen, sondern den <strong>vorigen</strong> Validierungsverlust – und zwar unverändert für alle acht Mini-Batch-Schritte einer Epoche:</p>
+
+<pre><span class="c">// tig-challenges/src/neuralnet_optimizer/mod.rs — gekürzt</span>
+<span class="k">let</span> param_updates = optimizer_step(/* … */, prev_validation_loss, /* … */);
+<span class="c">// … erst nach allen Batches der Epoche: …</span>
+prev_validation_loss = Some(avg_val_loss);   <span class="c">// mod.rs:569</span></pre>
+
+<p>Der Optimierer wertet dieses Signal aber je Schritt aus. Die Differenz <span class="mono">improvement = prev − curr</span> ist deshalb in sieben von acht Schritten <em>exakt null</em>. Alles, was daran hängt – der Stagnationszähler, die Trenderkennung, die Steigungsglättung, die Wahl der Mischungsgewichte – arbeitet mit einer Auflösung, die das Signal nicht hergibt. Ein Stagnationszähler, der bei 25 eine Lernratenerhöhung auslöst, erreicht diesen Stand nach gut drei Epochen, nicht nach 25.</p>
+
+<div class="box warn"><div class="t">Folge</div>
+<p>Die Regelkreise sind nicht falsch programmiert, aber gegen die falsche Zeitachse kalibriert. Da die Schwellenwerte empirisch abgestimmt wurden, „funktionieren“ sie – sie tun nur etwas anderes, als ihre Namen und Kommentare nahelegen. Das erklärt zugleich, warum so viele Konstanten so spezifisch sind: Sie kompensieren eine Verzerrung, die man auch beseitigen könnte.</p></div>
+
+<h3><span class="num">6.4</span>Reproduzierbarkeit</h3>
+<p>Zwei Stellen brechen die Wiederholbarkeit, und beide sitzen in T30 und T26.</p>
+<p>Erstens summiert <span class="mono">kernels_t30.cu:28</span> Blockergebnisse per <span class="mono">atomicAdd</span> auf einen Gleitkommawert. Gleitkommaaddition ist nicht assoziativ, und die Reihenfolge, in der Blöcke fertig werden, bestimmt die Hardware. Derselbe Lauf auf derselben Karte kann damit unterschiedliche Werte liefern – und dieser Wert steuert die Lernrate.</p>
+<p>Zweitens hängt die Blockzahl je Tensor von <span class="mono">prop.multiProcessorCount</span> ab, und die Kernels reduzieren <em>je Block</em>. Ergebnisse sind damit von der GPU abhängig. Für ein Protokoll, dessen Prüfung auf der Wiederholbarkeit eines Laufs beruht, ist das die ernsteste der hier genannten Schwächen.</p>
+
+<h3><span class="num">6.5</span>Wie diese Befunde zu lesen sind</h3>
+<p>Es wäre falsch, daraus auf Nachlässigkeit zu schließen. Fast alle toten Pfade sind Rückstände einer <em>Arbeitsweise</em>: Es wird eine Erweiterung eingebaut, mit einem neutralisierenden Vorgabewert versehen, gemessen – und wenn sie nichts bringt, bleibt sie ausgeschaltet stehen, statt entfernt zu werden. Der Kommentar „<em>swap#3 DEAD</em>“ in <span class="mono">track_t27.rs:74</span> sagt genau das. Aus Sicht des Wettbewerbs ist das rational: Entfernen kostet Zeit und riskiert, dass sich etwas anderes ändert.</p>
+
+<p>Der Preis ist, dass der Code seine eigene Wirkung nicht mehr korrekt beschreibt. <strong>Der tatsächliche Wettbewerbsvorsprung stammt aus einem deutlich kleineren Teil des Programms, als sein Umfang vermuten lässt</strong> – aus dem Consensus-Kern, der Steuerung über den Validierungsverlust, dem Schrittbudget als Ausstiegskriterium und dem DC-Puls. Das ist eine gute Nachricht für die Weiterentwicklung: Der Teil, der zählt, ist überschaubar.</p>
+<h3><span class="num">6.6</span>Befunde im Überblick</h3>
+<table>
+<tr><th style="width:15%">Gewicht</th><th style="width:47%">Befund</th><th style="width:38%">Fundstelle</th></tr>
+<tr><td><span class="tag l">hoch</span></td><td>Validierungsverlust ist epochenkonstant und um eine Epoche verzögert; alle trendbasierten Regelkreise arbeiten in Schrittauflösung</td><td class="ref">tig-challenges/…/mod.rs:509, 569<br>helpers.rs:169–262</td></tr>
+<tr><td><span class="tag l">hoch</span></td><td>Gleitkomma-<span class="mono">atomicAdd</span> in der Lernratensteuerung ⇒ Lauf-zu-Lauf-Abweichung</td><td class="ref">kernels_t30.cu:28</td></tr>
+<tr><td><span class="tag l">hoch</span></td><td>Blockzahl hängt von <span class="mono">multiProcessorCount</span> ab, Reduktion erfolgt je Block ⇒ GPU-abhängige Ergebnisse</td><td class="ref">track_t26.rs:137<br>kernels_t26.cu:175–201</td></tr>
+<tr><td><span class="tag m">mittel</span></td><td>Gewichtsabfall im schnellen Pfad von T26 wirkt auf den Gradienten statt auf das Gewicht; robuster Pfad derselben Datei macht es anders</td><td class="ref">kernels_t26.cu:228 vs. :110</td></tr>
+<tr><td><span class="tag m">mittel</span></td><td>Muon, MARS und Sophia sind in der ausgelieferten Konfiguration abgeschaltet; 11 von 13 Kernels in T27 laufen nicht</td><td class="ref">track_t27.rs:596–616<br>mod.rs:108</td></tr>
+<tr><td><span class="tag m">mittel</span></td><td><span class="mono">output_layer_damping</span> unerreichbar bzw. wirkungslos – die Ausgabeschicht ist eingefroren</td><td class="ref">track_t29.rs:739<br>challenge <span class="mono">num_frozen_layers = 2</span></td></tr>
+<tr><td><span class="tag m">mittel</span></td><td>DC-Logik liegt doppelt vor: handgeschrieben für Tiefe 4, verallgemeinert für die übrigen vier Tracks</td><td class="ref">track_t29.rs:162–381<br>helpers.rs:366–861</td></tr>
+<tr><td><span class="tag m">mittel</span></td><td>Die im Code viermal zitierte Ergebnisdatei <span class="mono">RESULTS.md</span> liegt dem Beitrag nicht bei</td><td class="ref">track_t26.rs:25, t27:18,<br>t28:17, t30:389</td></tr>
+<tr><td><span class="tag s">gering</span></td><td>Vorgabewerte ohne Leser: <span class="mono">init_scale</span> (dokumentiert unerreichbar), fünf der vierzehn T27-Werte</td><td class="ref">mod.rs:90, :103–107<br>track_t26.rs:373</td></tr>
+<tr><td><span class="tag s">gering</span></td><td>Gleitender Mittelwert teilt fest durch 10, obwohl die Bedingung schon ab 6 Einträgen greift – anfänglich zu niedriger Schätzwert</td><td class="ref">helpers.rs:193–195</td></tr>
+<tr><td><span class="tag s">gering</span></td><td>Bias-Korrektur nutzt <span class="mono">t = step_count + 1</span>, obwohl der Zähler bereits erhöht wurde; zudem ist <span class="mono">β₁</span> nicht konstant, wie die Formel unterstellt</td><td class="ref">helpers.rs:170<br>track_t29.rs:675</td></tr>
+<tr><td><span class="tag s">gering</span></td><td>Genau ein Unit-Test im gesamten Beitrag, und er prüft nur die Indexrechnung des DC-Moduls</td><td class="ref">helpers.rs:840–859</td></tr>
+</table>
+<div class="tcap"><b>Tabelle 3</b> — Befunde, jeweils am Quelltext nachgeprüft. „Gewicht“ bezieht sich auf die Folgen für Korrektheit und Nachprüfbarkeit, nicht auf den Aufwand einer Behebung.</div>
+
+</section>
+
+<!-- ══════════════════════ 7 WEITERENTWICKLUNG ══════════════════════ -->
+<section>
+<h2><span class="num">7</span>Wie man dc_steer_v6 weiterentwickeln könnte</h2>
+
+<p class="lead">Die Vorschläge sind nach Horizont geordnet und jeweils an einer Stelle im Code verankert. Wo ich den erwarteten Nutzen nicht beziffern kann, sage ich das. Alle bleiben innerhalb der Regeln – es wird nur Optimiererlogik geändert; wo ein Vorschlag an die Grenze geht, steht es dabei.</p>
+
+<h3><span class="num">7.1</span>Schnell umsetzbar</h3>
+
+<h4>1 — Die Regelkreise auf die Epochenachse legen <span class="tag s">S</span> <span class="tag hi">hohe Wirkung</span></h4>
+<p>Der Validierungsverlust ändert sich einmal je Epoche. Alles, was aus seinem Verlauf Trends, Stagnation oder Steigungen ableitet, gehört genau einmal je Epoche ausgewertet – erkennbar an <span class="mono">s.last_epoch != epoch</span>, wie es <span class="mono">track_t27.rs</span> für seinen Plateauzähler bereits richtig macht. Betroffen sind <span class="mono">update_state_from_val_loss</span> und <span class="mono">compute_global_damp</span> in <span class="mono">helpers.rs</span> sowie die eingebettete Kopie in <span class="mono">track_t30.rs</span>.</p>
+<p>Wichtig: Das ist <em>keine</em> reine Aufräumarbeit, sondern eine Verhaltensänderung. Die Schwellenwerte wurden gegen die verzerrte Achse abgestimmt und müssen mitwandern – ein Stagnationszähler von 25 Schritten entspricht gut drei Epochen. Der Gewinn ist, dass die Parameter danach bedeuten, was sie heißen, und dass die Regelung das Signal mit voller statt mit einem Achtel der wirksamen Auflösung nutzt.</p>
+
+<h4>2 — Den Nichtdeterminismus beseitigen <span class="tag s">S</span> <span class="tag hi">hohe Wirkung</span></h4>
+<p>Zwei gezielte Eingriffe: Die Gleitkomma-<span class="mono">atomicAdd</span>-Reduktion in <span class="mono">kernels_t30.cu:28</span> durch eine zweistufige Reduktion mit fester Reihenfolge ersetzen, und die Blockzahl nicht mehr von <span class="mono">prop.multiProcessorCount</span> abhängen lassen, sondern fest aus der Tensorlänge ableiten. Beides kostet kaum Rechenzeit und macht Läufe zwischen Karten und zwischen Wiederholungen vergleichbar – was für ein Protokoll, das Lösungen nachprüft, mehr wert ist als ein weiterer Bruchteil Quality.</p>
+
+<h4>3 — Den Regressionskoeffizienten auf allen Tracks messen <span class="tag s">S</span> <span class="tag mid">mittlere Wirkung</span></h4>
+<p>Für T26 ist <span class="mono">dc_gains = [1.2]</span> belegt und mit <span class="mono">+4.501</span> Median bei <span class="mono">t = 2,20</span> begründet. Für T7 wurde derselbe Wert gemessen und als wirkungslos verworfen. Für <strong>T27, T28 und T29 liegt keine Messung vor</strong> – dort steht weiterhin der analytische Wert 1,0, obwohl das Argument für die Unterschätzung tiefenunabhängig ist. Die Messapparatur existiert bereits: die Gain-Leiter über <span class="mono">dc_gains</span> mit gepaarter Bewertung. Das ist der billigste noch offene Hebel im ganzen Algorithmus.</p>
+
+<h4>4 — Den Gewichtsabfall in T26 geradeziehen <span class="tag s">S</span> <span class="tag lo">kleine Wirkung</span></h4>
+<p>Eine Zeile: <span class="mono">weight_decay * g_pred</span> durch einen entkoppelten Term <span class="mono">− lr·wd·w</span> ersetzen, wie es der robuste Pfad derselben Datei und T29 durchgehend tun. Ob das die Quality verbessert, ist offen – die Konstante 0,0020 wurde gegen das falsche Verhalten abgestimmt. Aber danach stimmen Name und Wirkung überein, und die Konstante lässt sich sinnvoll neu suchen.</p>
+
+<h4>5 — Aufräumen, was nachweislich nicht läuft <span class="tag s">S</span> <span class="tag lo">kleine Wirkung</span></h4>
+<p>Die vier nie geladenen Kernels in <span class="mono">kernels_t27.cu</span>, die Vorgabewerte ohne Leser und die unerreichbaren Zweige entfernen – und die zugehörigen Zustandspuffer gleich mit. Verhaltensneutral per Konstruktion, weil die Pfade nicht laufen. Der Nutzen ist nicht Geschwindigkeit, sondern dass der nächste Leser – auch der Autor in einem Jahr – dem Code wieder glauben kann. Für Muon und MARS gilt eine Ausnahme: Sie sind über Hyperparameter erreichbar und sollten als solche dokumentiert, nicht gelöscht werden.</p>
+
+<h4>6 — <span class="mono">RESULTS.md</span> beilegen <span class="tag s">S</span></h4>
+<p>Vier Dateien berufen sich auf eine Ergebnisdatei, die dem Beitrag nicht beiliegt. Sie ist die Belegkette für jede eingebackene Konstante. Ohne sie ist die sorgfältigste Messmethodik von außen nicht nachvollziehbar – und genau das ist im TIG-Kontext, wo andere Innovatoren auf einem Beitrag aufbauen sollen, der Unterschied zwischen einem Ergebnis und einem Beweis.</p>
+
+<h3><span class="num">7.2</span>Mittelfristig</h3>
+
+<h4>7 — Den Rauschboden schätzen statt raten <span class="tag m">M</span> <span class="tag hi">hohe Wirkung</span></h4>
+<p>Dies ist der Vorschlag mit dem besten Verhältnis von Aufwand zu Wirkung. <span class="mono">noise_variance</span> steuert praktisch jede Entscheidung im Algorithmus und wird heute als <span class="mono">min(min_loss/5, recent_avg/8)</span> geschätzt – mit frei gewählten Divisoren und einer Deckelung bei 0,05, die verdächtig nah am wahren Wert 0,04 liegt. Die Folge ist ein selbstbezüglicher Regelkreis: Weil sich <span class="mono">noise_variance</span> auf ein Achtel des laufenden Mittels einpendelt, ist die Bedingung für die „Präzisionszone“ im eingeschwungenen Zustand fast immer erfüllt. Ein Mechanismus, der ein seltenes Fenster markieren sollte, ist zum Dauerzustand geworden.</p>
+
+<p>Dabei ist die Größe <em>messbar</em>, und zwar mit Bordmitteln. Die Eingabe ist eindimensional und gleichverteilt auf <span class="mono">[−1, 1]</span>, die Zielfunktion ist bandbegrenzt glatt. Damit greift der klassische differenzbasierte Varianzschätzer: Man sortiert die 1.000 Trainingspunkte nach ihrer Eingabe und bildet</p>
+
+<div class="box key"><div class="t">Differenzbasierter Schätzer des Rauschbodens</div>
+<p style="text-align:center;margin:.35em 0"><span class="mono">σ̂² = 1 / (2(n−1)) · Σ<sub>i</sub> (y<sub>i+1</sub> − y<sub>i</sub>)²</span></p>
+<p>Der systematische Fehler ist die halbe mittlere quadrierte Funktionsänderung zwischen benachbarten Punkten. Mit dem <em>wirksamen</em> Längenmaß 0,09 (siehe Abschnitt&nbsp;2.3) ist <span class="mono">Var(f′) = l⁻⁴ ≈ 123</span>; bei 1.000 Punkten auf einem Intervall der Länge 2 ist der mittlere quadrierte Abstand <span class="mono">8·10⁻⁶</span>, der Bias also <span class="mono">≈ 5·10⁻⁴</span> gegenüber <span class="mono">σ² = 0,04</span> – <strong>gut ein Prozent</strong>. Die statistische Streuung liegt bei rund vier Prozent, über beide Ausgabedimensionen gemittelt. Wer genauer will, nimmt einen Differenzschätzer zweiter Ordnung; der drückt den Bias um eine weitere Größenordnung. Der Schätzer braucht nur Daten, die das Modell ohnehin sieht, und läuft einmal beim Start.</p></div>
+
+<p>Damit wird aus einer abgestimmten Konstante eine gemessene Größe. Alle Schwellen, die heute als Vielfache von <span class="mono">noise_variance</span> formuliert sind, bekommen eine physikalische Bedeutung: Ein Verlust von <span class="mono">1,5·σ̂²</span> heißt dann wirklich „das Modell erklärt alles bis auf fünfzig Prozent Überschuss über dem Rauschen“. Und – der eigentliche Gewinn – die Abstimmung wird robust gegen Änderungen an der Challenge, weil sie an einer gemessenen statt an einer geratenen Größe hängt.</p>
+
+<h4>8 — DC-Steering um die Maßstabskorrektur erweitern <span class="tag m">M</span> <span class="tag hi">hohe Wirkung</span></h4>
+<p>Der Puls korrigiert bislang den Versatz. Die kleinste-Quadrate-optimale Nachkalibrierung einer Vorhersage hat aber zwei Freiheitsgrade: <span class="mono">ŷ ↦ a·ŷ + b</span>. Der Versatz <span class="mono">b</span> ist erledigt; der Maßstab <span class="mono">a</span> nicht. Bei einem Modell, das – wie hier durch die eingefrorene Zufallsprojektion erzwungen – systematisch zur Mitte hin schrumpft, ist gerade der Maßstabsfehler der größere Posten.</p>
+<p>Der Weg dorthin ist derselbe: Die <em>Skalenparameter</em> der letzten trainierbaren BatchNorm wirken multiplikativ und liegen im selben Aktualisierungsvektor wie die Verschiebungen. Die erforderliche Kovarianz zwischen Vorhersage und Ziel ist auf dem Trainingsteil berechenbar, ohne zusätzliche Vorwärtsdurchläufe, wenn man die Ausgaben einer Epoche mitführt. Die vorhandene Puls-Mechanik – einspielen, validieren, zurücknehmen, per gepaarter Messung bewerten – lässt sich unverändert weiterverwenden.</p>
+
+<h4>9 — Die fünf Tracks auf eine parametrierte Implementierung bringen <span class="tag l">L</span> <span class="tag mid">mittlere Wirkung</span></h4>
+<p>Zwei Verfahren, fünf Abstimmungen – das sind zwei Implementierungen plus eine Tabelle, nicht fünf Dateien. Konkret: die eingebettete Helper-Kopie in <span class="mono">track_t30.rs</span> auflösen, die handgeschriebene DC-Fassung in <span class="mono">track_t29.rs</span> durch das verallgemeinerte Modul ersetzen (die Indexgleichheit ist bereits getestet), T27 und T28 zu einer Datei mit Schaltern zusammenführen. Der Nutzen ist nicht ästhetisch: Jede der obigen Verbesserungen wirkt danach auf allen Tracks statt auf einem, und die Gefahr, dass eine Korrektur in vier von fünf Kopien ankommt, verschwindet.</p>
+
+<h4>10 — Eine reproduzierbare Messumgebung beilegen <span class="tag m">M</span> <span class="tag mid">mittlere Wirkung</span></h4>
+<p>Die Messmethodik des Autors – gepaarte Nonces, Bündelmediane, t-Werte, Paritäts-Prüfwerte – existiert offensichtlich, aber nur außerhalb des Beitrags. Ein beiliegendes Skript, das eine Konfiguration über <span class="mono">n</span> Nonces gegen eine Referenz laufen lässt und Median, t-Wert und Laufzeit ausgibt, würde aus privatem Handwerk ein nachnutzbares Werkzeug machen. Dasselbe gilt für Tests: Der eine vorhandene Unit-Test prüft Indexarithmetik; testbar wären ohne GPU auch die Lernratenpläne, die Mischungsgewichte und der DC-Solver gegen eine Referenzimplementierung.</p>
+
+<h3><span class="num">7.3</span>Strategisch</h3>
+
+<h4>11 — Den Puls verallgemeinern: ein eigener Parametersatz für die Bewertung <span class="tag l">L</span> <span class="tag hi">hohe Wirkung</span></h4>
+<p>Dies ist die konsequente Fortführung der Kernidee und der interessanteste offene Zug. DC-Steering nutzt aus, dass der Harness <em>das beste validierte Modell</em> sichert, nicht das zuletzt trainierte – und dass der Optimierer über den Aktualisierungskanal bestimmen kann, welche Parameter zum Validierungszeitpunkt im Netz stehen. Bisher wird dieser Kanal für einen 256-elementigen Versatzvektor genutzt. Er trägt aber <em>jede</em> Parameteränderung.</p>
+
+<div class="box key"><div class="t">Der Vorschlag</div>
+<p>Der Optimierer führt einen gleitenden Mittelwert <span class="mono">θ_avg</span> der Parameter mit. Im letzten Schritt einer Epoche spielt er die Differenz <span class="mono">θ_avg − θ</span> als Puls ein; die Validierung sieht damit den gemittelten Parametersatz. Ist er besser, sichert der Harness ihn. Im ersten Schritt der Folgeepoche wird der Puls zurückgenommen, und das Training läuft auf der ungemittelten Bahn weiter.</p></div>
+
+<p>Das ist Gewichtsmittelung – ein seit Langem etabliertes, verlässliches Mittel gegen die Streuung später Trainingsphasen – die hier <em>ohne</em> die übliche Nebenwirkung zu haben ist, dass man zwischen gemitteltem und laufendem Modell wählen müsste. Man bekommt beides: eine ungestörte Trainingsbahn und einen gemittelten Bewertungspunkt. Der Aufwand ist ein zusätzlicher Puffer je Tensor und zwei zusätzliche Kernelstarts je Epoche.</p>
+
+<div class="box warn"><div class="t">Der Haken, den man messen muss</div>
+<p>Die Rücknahme ist additiv – der Harness kennt nur <span class="mono">θ ← θ + Δθ</span>. In <span class="mono">f32</span> gilt aber <span class="mono">(θ + d) − d ≠ θ</span>. Beim heutigen DC-Puls betrifft das 256 Werte mit kleiner Amplitude; bei vollen Parametersätzen über zweihundert Epochen kann sich die Abweichung aufsummieren. Vor dem Einbau gehört das quantifiziert – etwa, indem man den Puls nur auf die größten Schichten anwendet oder nur in der Spätphase, in der die Mittelung ohnehin am meisten bringt.</p>
+<p>Ein zweiter, bereits bestehender Haken: Die Rücknahme erfolgt einen Mini-Batch zu spät. Der Harness rechnet Vorwärts- und Rückwärtsdurchlauf, <em>bevor</em> er <span class="mono">optimizer_step</span> aufruft – der erste Batch der Folgeepoche sieht den Puls also noch. Beim kleinen DC-Versatz fällt das kaum ins Gewicht; bei einem vollen Parametersatz ist es ein echter Störfaktor, den man über den ungenutzten Kanal <span class="mono">optimizer_query_at_params</span> sauber lösen könnte.</p></div>
+
+<h4>12 — Die eingebackenen Konstanten durch einen Selbsteinstellungslauf ersetzen <span class="tag l">L</span> <span class="tag mid">mittlere Wirkung</span></h4>
+<p>Heute bricht <span class="mono">solve_challenge</span> bei jeder anderen Tiefe als 4, 7, 10, 14 oder 18 mit einem Fehler ab. Das ist derzeit vollständig – die Challenge kennt nur diese fünf –, aber es ist eine Wette darauf, dass sich das nicht ändert. Eine tiefenabhängige Interpolation der wichtigsten Größen plus ein generischer Rückfallpfad kostet wenig und nimmt dem Beitrag seine Sprödigkeit.</p>
+<p>Weiter gedacht: Die ersten zwanzig bis dreißig Epochen sind ohnehin Aufwärmphase. Man könnte in dieser Zeit zwei oder drei Konfigurationen gegeneinander laufen lassen und nach dem Muster eines mehrarmigen Banditen entscheiden – mit derselben gepaarten Bewertungslogik, die die Gain-Leiter schon benutzt. Aus einem eingebackenen Abstimmungsergebnis würde eine im Lauf getroffene Entscheidung.</p>
+
+<h4>13 — Das <span class="mono">total_steps</span>-Budget selbst bestimmen <span class="tag m">M</span> <span class="tag mid">mittlere Wirkung</span></h4>
+<p>Die Schrittzahl ist heute je Track eine feste Zahl zwischen 1.110 und 2.850 – sie bestimmt sowohl den Lernratenplan als auch faktisch den Abbruchzeitpunkt. Beide Rollen ließen sich trennen: Der Plan behält sein nominelles Budget, und der Ausstieg wird an eine gemessene Bedingung gehängt – etwa daran, dass der Validierungsverlust den geschätzten Rauschboden um weniger als einen festen Faktor überschreitet und sich über <span class="mono">k</span> Epochen nicht mehr signifikant bewegt. Das ist genau die Art Entscheidung, für die der geschätzte Rauschboden aus Vorschlag&nbsp;7 die Grundlage liefert.</p>
+
+<h3><span class="num">7.4</span>Wege, die ich nicht gehen würde</h3>
+<dl>
+<dt>Weitere Optimiererbausteine zuschalten</dt>
+<dd>Muon, MARS, Sophia, QHAdam und der EMA-Nesterov-Aufsatz sind bereits eingebaut – und stehen alle auf neutral. Das ist kein Zufall, sondern das Ergebnis von Messungen. Ein sechster Baustein wird daran nichts ändern; das Problem ist nicht die Auswahl der Aktualisierungsregel.</dd>
+<dt>Die eingebackenen Konstanten feiner absuchen</dt>
+<dd>Der Ertrag sinkt erkennbar – die dokumentierten Gewinne liegen im Bereich weniger tausend Quality-Punkte bei t-Werten um 2. Jede weitere Nachkommastelle erhöht die Zerbrechlichkeit, ohne die Ursache zu verbessern. Erst die Regelkreise geradeziehen, dann neu abstimmen.</dd>
+<dt>Länger trainieren</dt>
+<dd>Dass die Tracks bei einem Fünftel der erlaubten Epochen aussteigen, ist kein Versehen, sondern eine Entscheidung gegen das Fuel-Budget. Mehr Epochen kosten unmittelbar und bringen nahe am Rauschboden fast nichts.</dd>
+<dt>Die rauschfreien Zielwerte heranziehen</dt>
+<dd>Der Datensatz stellt über <span class="mono">dataset.train_targets_true_f()</span> auch die rauschfreien Ziele bereit, und technisch könnte der Optimierer sie lesen. Damit ließe sich der Rauschboden exakt bestimmen – und weit mehr. Das wäre allerdings Information, über die kein reales Training verfügt, und der Geist der Aufgabe ist eindeutig. Vorschlag&nbsp;7 erreicht praktisch dasselbe mit Daten, die das Modell ohnehin sieht; das ist der saubere Weg.</dd>
+</dl>
+
+<h3><span class="num">7.5</span>Auf einen Blick</h3>
+<table>
+<tr><th style="width:5%">#</th><th style="width:38%">Maßnahme</th><th style="width:9%">Aufwand</th><th style="width:11%">Wirkung</th><th style="width:37%">Ansatzpunkt</th></tr>
+<tr><td class="num">1</td><td>Regelkreise auf die Epochenachse legen</td><td><span class="tag s">S</span></td><td><span class="tag hi">hoch</span></td><td class="ref">helpers.rs:169–336, track_t30.rs</td></tr>
+<tr><td class="num">2</td><td>Nichtdeterminismus beseitigen</td><td><span class="tag s">S</span></td><td><span class="tag hi">hoch</span></td><td class="ref">kernels_t30.cu:28, track_t26.rs:137</td></tr>
+<tr><td class="num">3</td><td>Regressionskoeffizient je Track messen</td><td><span class="tag s">S</span></td><td><span class="tag mid">mittel</span></td><td class="ref">mod.rs dc_gains, helpers.rs:807</td></tr>
+<tr><td class="num">4</td><td>Gewichtsabfall in T26 entkoppeln</td><td><span class="tag s">S</span></td><td><span class="tag lo">gering</span></td><td class="ref">kernels_t26.cu:228</td></tr>
+<tr><td class="num">5</td><td>Nachweislich toten Code entfernen</td><td><span class="tag s">S</span></td><td><span class="tag lo">gering</span></td><td class="ref">kernels_t27.cu, mod.rs:90</td></tr>
+<tr><td class="num">6</td><td><span class="mono">RESULTS.md</span> beilegen</td><td><span class="tag s">S</span></td><td><span class="tag mid">mittel</span></td><td class="ref">Beitragsverzeichnis</td></tr>
+<tr><td class="num">7</td><td>Rauschboden differenzbasiert schätzen</td><td><span class="tag m">M</span></td><td><span class="tag hi">hoch</span></td><td class="ref">helpers.rs:192–199 + solve()</td></tr>
+<tr><td class="num">8</td><td>DC um die Maßstabskorrektur erweitern</td><td><span class="tag m">M</span></td><td><span class="tag hi">hoch</span></td><td class="ref">helpers.rs::dc</td></tr>
+<tr><td class="num">9</td><td>Fünf Tracks auf eine Implementierung</td><td><span class="tag l">L</span></td><td><span class="tag mid">mittel</span></td><td class="ref">track_t26…t30.rs</td></tr>
+<tr><td class="num">10</td><td>Messumgebung und Tests beilegen</td><td><span class="tag m">M</span></td><td><span class="tag mid">mittel</span></td><td class="ref">Beitragsverzeichnis</td></tr>
+<tr><td class="num">11</td><td>Gemittelter Parametersatz für die Bewertung</td><td><span class="tag l">L</span></td><td><span class="tag hi">hoch</span></td><td class="ref">helpers.rs::dc::step</td></tr>
+<tr><td class="num">12</td><td>Selbsteinstellung statt eingebackener Werte</td><td><span class="tag l">L</span></td><td><span class="tag mid">mittel</span></td><td class="ref">mod.rs:63–112</td></tr>
+<tr><td class="num">13</td><td>Ausstieg an eine gemessene Bedingung hängen</td><td><span class="tag m">M</span></td><td><span class="tag mid">mittel</span></td><td class="ref">helpers.rs spectral_phase_lr</td></tr>
+</table>
+<div class="tcap"><b>Tabelle 4</b> — Aufwand: <span class="tag s">S</span> unter einer Woche, <span class="tag m">M</span> ein bis zwei Monate, <span class="tag l">L</span> darüber. „Wirkung“ bezieht sich auf Quality <em>und</em> Nachprüfbarkeit; Nummer 2 und 6 verbessern vor allem Letztere.</div>
+</section>
+
+<!-- ══════════════════════ 8 ÜBERTRAGBARKEIT ══════════════════════ -->
+<section>
+<h2><span class="num">8</span>Übertragbarkeit über TIG hinaus</h2>
+
+<p class="lead">Die ehrliche Frage zum Schluss: Was von alldem taugt außerhalb dieses Benchmarks? Die Antwort zerfällt sauber in zwei Teile – und der übertragbare Teil ist kleiner, aber interessanter, als der Umfang des Codes vermuten lässt.</p>
+
+<h3><span class="num">8.1</span>Was sich überträgt</h3>
+
+<dl>
+<dt>Der Konsensgedanke</dt>
+<dd>Zwei Schätzer der Aktualisierungsrichtung zu bilden – einen momentumgetriebenen, einen krümmungsgetriebenen – und bei Vorzeichenwiderspruch dem robusteren mehr Gewicht zu geben, ist kein Kniff für diese Aufgabe, sondern eine allgemeine Antwort auf verrauschte Gradienten. In T27 steht die einfachste Form davon: <span class="mono">keep = (dir·g > 0) ? 1 : 0,25</span> – der Schritt wird gestutzt, wenn er dem rohen Gradienten widerspricht. Das ähnelt auffällig dem, was in der jüngeren Literatur als <em>cautious</em> Optimierer beschrieben wird, wo die Maske hart auf null geht. Ein Vergleich beider Varianten auf üblichen Vergleichsmessungen wäre eine kleine, gut abgegrenzte Studie.</dd>
+
+<dt>Nachkalibrierung am Bewertungspunkt</dt>
+<dd>Der allgemeine Kern von DC-Steering hat mit TIG nichts zu tun: <em>Bevor man ein Modell bewertet oder sichert, lohnt sich eine affine Nachkalibrierung seiner Ausgabe.</em> Zwei Parameter, auf einer Validierungsmenge geschätzt, kosten nichts und verringern den quadratischen Fehler garantiert nicht. In der Prognoserechnung ist das Standard; in der tiefen Regression wird es überraschend selten gemacht. Dass hier der Umweg über BatchNorm-Verschiebungen nötig war, ist eine Eigenheit der Schnittstelle – der Gedanke dahinter ist allgemein.</dd>
+
+<dt>Die Asymmetrie zwischen Trainings- und Auswertungsmodus</dt>
+<dd>Der meines Erachtens interessanteste übertragbare Befund. BatchNorm normiert im Auswertungsmodus mit einer <em>veralteten</em> Statistik. Eine frische Parameteränderung schlägt deshalb an den Ausgang durch, während dieselbe Änderung nach ein paar Epochen von der nachgezogenen Statistik weitgehend wieder herausgerechnet würde. Wer Parameter nachträglich verändert – beim Beschneiden von Netzen, beim Quantisieren, beim Verschmelzen zweier Modelle –, trifft auf genau dieses Phänomen, meist als unerklärliche Abweichung zwischen den Moden. Hier wird es zum ersten Mal, soweit ich sehe, absichtlich <em>genutzt</em>. Das verdient eine saubere Untersuchung.</dd>
+
+<dt>Die Arbeitsweise</dt>
+<dd>Jede Erweiterung mit einem Vorgabewert zu versehen, der sie byte-exakt neutralisiert, und jede Änderung gegen gepaarte Läufe zu messen – das ist ein Verfahren, das jede Gruppe übernehmen kann, die an Optimierern arbeitet. Der übliche Zustand in diesem Feld ist, dass Verbesserungen von Gleitkommadrift und Startwertglück nicht zu trennen sind. Hier sind sie es.</dd>
+</dl>
+
+<h3><span class="num">8.2</span>Was nicht überträgt</h3>
+<p>Die eingebackenen Konstanten sind Abstimmungsergebnisse für genau diese fünf Aufgaben. Die analytische DC-Lösung setzt voraus, dass die letzten Schichten eingefroren <em>und damit bekannt</em> sind – ein realistisches Training hat diese Struktur nicht. Und die Zonenlogik rund um <span class="mono">noise_variance</span> hängt an einem Rauschniveau, das hier bekannt und konstant ist.</p>
+<p>Man sollte das nicht als Kritik lesen. Der Beitrag ist für einen Wettbewerb geschrieben, der Spezialisierung belohnt, und erfüllt diesen Zweck. Nur: Wer ihn als allgemeinen Optimierer einsetzen will, nimmt im Wesentlichen den Consensus-Kern mit – und der ist rund ein Zehntel des Codes.</p>
+
+<h3><span class="num">8.3</span>Drei prüfbare Hypothesen</h3>
+<p>Wenn jemand den übertragbaren Teil belegen wollte, wären das die Experimente:</p>
+<ol>
+<li><strong>Konsens schlägt Vorsicht.</strong> Der weiche Übergang zwischen aggressivem und robustem Schätzer, gesteuert über Vorzeichenübereinstimmung und lokale Streuung, erreicht bei gleichem Rechenbudget einen niedrigeren Testfehler als eine harte Maske und als reines AdamW. Zu prüfen auf mehreren Aufgaben mit unterschiedlich verrauschten Gradienten; die Vorhersage ist, dass der Vorsprung mit dem Rauschniveau wächst.</li>
+<li><strong>Nachkalibrierung ist ein freies Mittagessen.</strong> Eine affine Nachkalibrierung der Ausgabe auf der Validierungsmenge, angewandt bei der Wahl des Prüfpunkts, senkt den Testfehler auf Standard-Regressionsaufgaben messbar und ohne Trainingskosten. Die Vorhersage ist, dass der Gewinn mit der Stärke der Regularisierung steigt, weil Schrumpfung zur Mitte genau den Maßstabsfehler erzeugt, den die Kalibrierung behebt.</li>
+<li><strong>Die Statistik-Verzögerung ist quantifizierbar.</strong> Wie viel der Wirkung einer Parameteränderung im Auswertungsmodus überlebt, ist eine fallende Funktion der Zahl der Trainingsschritte zwischen Änderung und Auswertung, mit der Trägheit der Laufstatistik als Zeitkonstante. Das ist direkt messbar – und hätte unmittelbare Folgen für alle Verfahren, die Netze nachträglich verändern.</li>
+</ol>
+<p>Keine dieser Hypothesen braucht TIG. Alle drei stammen aus dem Code.</p>
+</section>
+
+<!-- ══════════════════════ ANHANG ══════════════════════ -->
+<section>
+<h2><span class="num">A</span>Anhang</h2>
+
+<h3><span class="num">A.1</span>Dateien und Umfang</h3>
+<p class="small">Eingereicht am 7. August 2026 durch die Adresse <span class="mono">0x8e671c8f…8cd2</span>; im Repository als Commit <span class="mono">99f931b</span> „<em>Player 0x8e671c… submitted code neuralnet_optimizer/dc_steer_v6</em>“ mit 14 Dateien und 7.221 hinzugefügten Zeilen. Die Übersetzung in eine Bibliothek erfolgt anschließend durch TIG selbst, mit einer angepassten LLVM-Fassung, die Fuel-Zählung und Laufzeitsignatur einfügt.</p>
+
+<table>
+<tr><th>Datei</th><th class="num">Zeilen</th><th>Rolle</th></tr>
+<tr><td class="mono">mod.rs</td><td class="num">138</td><td>Einstieg, Verteilung nach Tiefe, eingebackene Vorgabewerte</td></tr>
+<tr><td class="mono">helpers.rs</td><td class="num">861</td><td>Gemeinsamer Zustand, Lernratenplan, Steuerung, DC-Modul, ein Unit-Test</td></tr>
+<tr><td class="mono">track_t29.rs</td><td class="num">935</td><td>Tiefe 4 – Consensus + eigene DC-Fassung</td></tr>
+<tr><td class="mono">track_t30.rs</td><td class="num">1.288</td><td>Tiefe 7 – Consensus mit eingebetteter Helper-Kopie</td></tr>
+<tr><td class="mono">track_t26.rs</td><td class="num">557</td><td>Tiefe 10 – Consensus + Init-Skalierung</td></tr>
+<tr><td class="mono">track_t27.rs</td><td class="num">630</td><td>Tiefe 14 – Prometheus mit Muon/MARS/Sophia (abgeschaltet)</td></tr>
+<tr><td class="mono">track_t28.rs</td><td class="num">387</td><td>Tiefe 18 – Prometheus, schlank</td></tr>
+<tr><td class="mono">kernels_t26…t30.cu</td><td class="num">2.398</td><td>CUDA-Kernels, je Track eine Datei</td></tr>
+<tr><td class="mono">README.md</td><td class="num">23</td><td>Einreichungsangaben und Lizenzhinweis</td></tr>
+<tr><td><b>Summe</b></td><td class="num"><b>7.194</b></td><td>4.796 Rust + 2.398 CUDA</td></tr>
+</table>
+
+<h3><span class="num">A.2</span>Die eingebackenen Vorgabewerte</h3>
+<p>Was <span class="mono">mod.rs</span> je Track vorbelegt, bevor der Track seine eigenen Vorgaben anwendet. Nutzerseitig übergebene Hyperparameter haben immer Vorrang. Grau hinterlegte Zeilen sind Werte, für die der jeweilige Track keinen Leser hat.</p>
+<table>
+<tr><th style="width:12%">Track</th><th style="width:10%" class="num">Tiefe</th><th style="width:78%">Vorgabewerte aus <span class="mono">mod.rs</span></th></tr>
+<tr><td class="mono">t29</td><td class="num">4</td><td class="mono">total_steps 1900 · warmup_steps 16 · beta2 0,999 · weight_decay 0,015 · bn_layer_boost 1,0 · spectral_boost 1,25 · nv_hi_lo 5,5</td></tr>
+<tr><td class="mono">t30</td><td class="num">7</td><td class="mono">transition_sign 0,13</td></tr>
+<tr><td class="mono">t26</td><td class="num">10</td><td class="mono">total_steps 2850 · warmup_steps 200 · bn_layer_boost 0,95 · noise_variance 0,025 · spectral_boost 0,95 · <span style="opacity:.55">init_scale 3,0</span> · dc_gains [1,2]</td></tr>
+<tr><td class="mono">t27</td><td class="num">14</td><td class="mono"><span style="opacity:.55">total_steps 1950 · warmup_steps 200 · bn_layer_boost 0,95 · noise_variance 0,025 · spectral_boost 0,95</span> · ab_blend 0,55 · ema_decay 0,9995 · mars_gamma 0,0 · min_lr_scale 0,5 · t_max_epochs 850 · nesterov_beta 0,8 · mars_clip_scale 1,0 · plateau_patience 12 · hidden_bias_scale 1,5</td></tr>
+<tr><td class="mono">t28</td><td class="num">18</td><td class="mono">total_steps 1110 · ghw_scale 1,0</td></tr>
+</table>
+<div class="tcap"><b>Tabelle 5</b> — Auffällig ist die Ungleichverteilung: T30 bekommt eine einzige Vorgabe, T27 vierzehn, von denen fünf nirgends gelesen werden.</div>
+
+<h3><span class="num">A.3</span>Lizenzlage</h3>
+<p>Die README des Beitrags nennt sechs Lizenzen gleichzeitig. Das ist kein Fehler, sondern das Lizenzmodell von TIG: Verschiedene Nutzungen greifen auf verschiedene Lizenzen zu.</p>
+<dl>
+<dt>Für Innovatoren, die darauf aufbauen wollen</dt>
+<dd>Die <em>TIG Innovator Outbound Game License</em>. Genau dieser Weg wurde hier beschritten – <span class="mono">dc_steer_v6</span> baut auf <span class="mono">neural_extrem_v7</span> eines anderen Einreichenden auf.</dd>
+<dt>Für Benchmarker</dt>
+<dd>Die <em>TIG Benchmarker Outbound Game License</em> regelt den Einsatz im Proof-of-Work-Betrieb.</dd>
+<dt>Für kommerzielle Nutzung außerhalb des Spiels</dt>
+<dd>Die <em>TIG Commercial License</em>. Wer Teile dieses Codes in ein Produkt übernehmen möchte – etwa den Consensus-Kern –, braucht sie. Die <em>TIG Open Data License</em> deckt den offenen Forschungsteil ab.</dd>
+</dl>
+<p>Praktisch heißt das für einen Leser dieses Berichts: Die <em>Ideen</em> aus Abschnitt&nbsp;8 sind frei verwendbar; das <em>Übernehmen des Quelltextes</em> in ein kommerzielles Produkt ist es nicht. Die Lizenztexte liegen unter <span class="mono">docs/licenses/</span> im Repository.</p>
+
+<h3><span class="num">A.4</span>Zur Methodik dieses Berichts</h3>
+<p>Grundlage ist ausschließlich der Quelltext im genannten Repository, Stand <span class="mono">main</span> am 17. September 2026. Es wurden <strong>keine eigenen Trainingsläufe</strong> durchgeführt; die Challenge benötigt eine CUDA-fähige GPU, die hier nicht zur Verfügung stand.</p>
+<p>Daraus folgt eine klare Grenze, die für alle Aussagen dieses Berichts gilt:</p>
+<ul>
+<li><strong>Belegt</strong> sind alle Aussagen über Struktur, Rechenwege, erreichbare und unerreichbare Zweige sowie über die Formeln der Challenge. Jede davon ist am Code nachgeprüft und mit Datei und Zeile belegt.</li>
+<li><strong>Angabe des Autors</strong> sind alle Zahlen zu gemessenen Quality-Gewinnen – die <span class="mono">+4.501</span> bei <span class="mono">t = 2,20</span> etwa stammen aus einem Codekommentar und sind hier nicht nachgemessen worden. Die zugehörige Belegdatei <span class="mono">RESULTS.md</span> liegt dem Beitrag nicht bei.</li>
+<li><strong>Abgeleitet</strong> sind die quantitativen Aussagen in Abschnitt&nbsp;2.3 und in Vorschlag&nbsp;7: Sie folgen aus den Konstanten der Challenge und sind im Text mitgerechnet, aber nicht empirisch überprüft.</li>
+<li><strong>Einschätzung</strong> ist die Gewichtung in Tabelle&nbsp;3 und die Reihenfolge in Abschnitt&nbsp;7. Ob eine der vorgeschlagenen Änderungen die Quality tatsächlich verbessert, kann nur eine gepaarte Messung zeigen – mit genau der Apparatur, deren Fehlen Vorschlag&nbsp;10 anspricht.</li>
+</ul>
+
+<h4>Fundstellen</h4>
+<p class="small">Sofern nicht anders angegeben, beziehen sich Dateinamen ohne Pfad auf <span class="mono">tig-algorithms/src/neuralnet_optimizer/dc_steer_v6/</span>. Die Challenge liegt unter <span class="mono">tig-challenges/src/neuralnet_optimizer/</span>, die Ausführungsumgebung unter <span class="mono">tig-runtime/</span>. Zeilennummern beziehen sich auf den oben genannten Stand und können sich mit künftigen Änderungen verschieben.</p>
+</section>
+
+</body></html>
