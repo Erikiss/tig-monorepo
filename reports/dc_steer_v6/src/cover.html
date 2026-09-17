@@ -1,0 +1,42 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8">
+<title>dc_steer_v6 – Anwendungsreport</title>
+<link rel="stylesheet" href="style.css"></head>
+<body><div class="cover">
+<div class="rule-top"></div>
+<div class="eyebrow">Technischer Anwendungsreport</div>
+<h1>dc_steer_v6<span class="sub">Ein DC-gesteuerter Consensus-Optimierer für die<br>TIG-Challenge <em>neuralnet_optimizer</em></span></h1>
+
+<p class="deck">Was dieser Optimierer tut, warum er so gebaut ist, wie er sich in The&nbsp;Innovation&nbsp;Game einfügt – und an welchen Stellen er sich sinnvoll weiterentwickeln lässt.</p>
+
+<div class="chips">
+  <span class="chip">5 Track-Implementierungen</span>
+  <span class="chip">7.194 Zeilen Rust + CUDA</span>
+  <span class="chip">DC-Steering als Kernidee</span>
+</div>
+
+<div class="glance">
+  <div class="g">
+    <div class="k">Die Kernidee</div>
+    <div class="v">Der Optimierer berechnet in geschlossener Form, um welchen konstanten Betrag der Netzausgang danebenliegt, spielt die Korrektur als kurzen Puls genau vor der Validierung ein – und nimmt sie danach wieder zurück. Bewertet wird das beste gesicherte Modell; genau dieser Punkt sieht die Korrektur.</div>
+  </div>
+  <div class="g">
+    <div class="k">Der Befund</div>
+    <div class="v">Handwerklich weit über dem Üblichen: ein Kernelstart je Schritt, deterministische Rechenwege, gepaarte Messungen mit t-Werten. Zugleich läuft ein erheblicher Teil der Maschinerie in der ausgelieferten Konfiguration gar nicht – der Vorsprung stammt aus einem kleineren Teil des Programms, als sein Umfang vermuten lässt.</div>
+  </div>
+  <div class="g">
+    <div class="k">Die Empfehlung</div>
+    <div class="v">Die Regelkreise auf die Epochenachse legen, den Rauschboden messen statt raten, und den Puls vom Versatz auf einen vollständigen Bewertungs-Parametersatz erweitern. Dreizehn Vorschläge in drei Horizonten, jeweils am Code verankert, finden sich in Abschnitt&nbsp;7.</div>
+  </div>
+</div>
+
+<div class="meta">
+  <div><div class="l">Gegenstand</div><div class="v"><span class="mono">tig-algorithms/src/<wbr>neuralnet_optimizer/<wbr>dc_steer_v6</span></div></div>
+  <div><div class="l">Repository</div><div class="v">Erikiss/tig-monorepo<br><span class="small">Branch <span class="mono">main</span></span></div></div>
+  <div><div class="l">Stand</div><div class="v">17. September 2026</div></div>
+  <div><div class="l">Urheber des Algorithmus</div><div class="v">ChervovNikita, 2026</div></div>
+  <div><div class="l">Challenge</div><div class="v">neuralnet_optimizer<br><span class="small">Tracks n = 4, 7, 10, 14, 18</span></div></div>
+  <div><div class="l">Grundlage</div><div class="v">Quelltextanalyse<br><span class="small">keine eigenen Benchmarkläufe</span></div></div>
+</div>
+
+<div class="disclaimer">Dieser Bericht ist eine unabhängige technische Einschätzung auf Basis des Quelltextes im genannten Repository. Er ist keine Veröffentlichung der TIG Foundation und nicht mit dem Urheber des Algorithmus abgestimmt. Alle quantitativen Aussagen sind entweder aus dem Code abgeleitet und mit Fundstelle belegt oder als Angabe des Autors im Quelltext gekennzeichnet; eigene Trainingsläufe waren nicht Teil der Untersuchung.</div>
+</div></body></html>
